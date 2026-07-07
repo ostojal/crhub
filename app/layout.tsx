@@ -1,8 +1,16 @@
+import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Navbar from "./components/navbar";
-import Providers from "./components/providers";
+import { Geist, Geist_Mono, Roboto, Roboto_Slab } from "next/font/google";
+import Navbar from "../components/navbar";
+import Providers from "../components/providers";
 import "./globals.css";
+
+const robotoSlabHeading = Roboto_Slab({
+  subsets: ["latin"],
+  variable: "--font-heading",
+});
+
+const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,9 +35,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={cn(
+        "h-full",
+        "antialiased",
+        geistSans.variable,
+        geistMono.variable,
+        "font-sans",
+        roboto.variable,
+        robotoSlabHeading.variable,
+      )}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
         <Providers>
           <Navbar />
           {children}
