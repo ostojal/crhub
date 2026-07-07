@@ -1,5 +1,5 @@
-import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Google],
@@ -9,9 +9,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     session({ session, token }) {
       if (token.sub) {
-        session.user.id = token.sub
+        session.user.id = token.sub;
       }
-      return session
+      return session;
     },
   },
-})
+});

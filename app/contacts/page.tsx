@@ -1,12 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactsPage() {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const { data: contacts, error } = await supabase
     .from("contacts")
     .select("*, contact_status(communication_status, interest_tag, updated_at)")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     return (
@@ -15,7 +15,7 @@ export default async function ContactsPage() {
           Greška pri učitavanju kontakata: {error.message}
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -37,7 +37,7 @@ export default async function ContactsPage() {
             {contacts?.map((contact) => {
               const status = Array.isArray(contact.contact_status)
                 ? contact.contact_status[0]
-                : contact.contact_status
+                : contact.contact_status;
 
               return (
                 <tr key={contact.id} className="border-t border-foreground/10">
@@ -57,7 +57,7 @@ export default async function ContactsPage() {
                     {status?.communication_status ?? "—"}
                   </td>
                 </tr>
-              )
+              );
             })}
           </tbody>
         </table>
@@ -69,5 +69,5 @@ export default async function ContactsPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
