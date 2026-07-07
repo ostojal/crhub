@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@base-ui/react": "^1.6.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "class-variance-authority": "^0.7.1",
@@ -17,6 +16,8 @@
     "lucide-react": "^1.23.0",
     "next": "16.2.2",
     "next-auth": "^5.0.0-beta.31",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.6.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",

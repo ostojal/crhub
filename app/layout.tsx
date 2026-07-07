@@ -1,8 +1,9 @@
+import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto, Roboto_Slab } from "next/font/google";
+import { SessionProvider } from "next-auth/react";
+import { Roboto, Roboto_Slab } from "next/font/google";
 import Navbar from "../components/navbar";
-import Providers from "../components/providers";
 import "./globals.css";
 
 const robotoSlabHeading = Roboto_Slab({
@@ -11,16 +12,6 @@ const robotoSlabHeading = Roboto_Slab({
 });
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "CRHub",
@@ -38,18 +29,24 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
-        geistSans.variable,
-        geistMono.variable,
         "font-sans",
         roboto.variable,
         robotoSlabHeading.variable,
       )}
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
-        <Providers>
-          <Navbar />
-          {children}
-        </Providers>
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <Navbar />
+            {children}
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );
