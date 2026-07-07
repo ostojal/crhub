@@ -16,6 +16,18 @@ const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "CRHub",
   description: "CRHub",
+
+  robots: {
+    index: false,
+  },
+
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon-16x16.png",
+  },
+
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({
