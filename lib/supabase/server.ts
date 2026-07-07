@@ -1,6 +1,6 @@
-import "server-only"
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/lib/database.types"
+import "server-only";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 // Uses the service role key and must only ever be imported in Server
 // Components, Server Functions, or Route Handlers. Access is via the
@@ -15,6 +15,6 @@ export function createClient() {
         persistSession: false,
         autoRefreshToken: false,
       },
-    }
-  )
+    },
+  );
 }

@@ -1,12 +1,13 @@
-import { auth, signOut } from "@/auth"
+import { auth, signOut } from "@/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function Navbar() {
-  const session = await auth()
+  const session = await auth();
 
-  if (!session?.user) return null
+  if (!session?.user) return null;
 
-  const { name, email, image } = session.user
-  const initial = (name ?? email ?? "?").charAt(0).toUpperCase()
+  const { name, email, image } = session.user;
+  const initial = (name ?? email ?? "?").charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-10 border-b border-foreground/10 bg-background/80 backdrop-blur">
@@ -38,8 +39,8 @@ export default async function Navbar() {
 
           <form
             action={async () => {
-              "use server"
-              await signOut({ redirectTo: "/login" })
+              "use server";
+              await signOut({ redirectTo: "/login" });
             }}
           >
             <button
@@ -49,8 +50,10 @@ export default async function Navbar() {
               Odjavi se
             </button>
           </form>
+
+          <ThemeToggle />
         </div>
       </nav>
     </header>
-  )
+  );
 }
