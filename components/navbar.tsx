@@ -1,5 +1,6 @@
 import { auth, signOut } from "@/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FdLogo } from "./fd-logo";
 
 export default async function Navbar() {
   const session = await auth();
@@ -10,11 +11,15 @@ export default async function Navbar() {
   const initial = (name ?? email ?? "?").charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-10 border-b border-foreground/10 bg-background/80 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-foreground/10 py-2 bg-background/80 backdrop-blur">
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <span className="text-sm font-semibold tracking-tight text-foreground">
-          CRHub
-        </span>
+        <div className="flex items-center justify-center gap-4">
+          <div className="grid size-10 place-items-center">
+            <FdLogo width={64} height={64} />
+          </div>
+
+          <p className="font-heading font-semibold">CRHub</p>
+        </div>
 
         <div className="flex items-center gap-3">
           {image ? (
