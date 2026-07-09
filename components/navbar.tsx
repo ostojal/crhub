@@ -23,13 +23,13 @@ export default async function Navbar() {
   return (
     <header className="sticky top-0 z-10 border-b border-foreground/10 bg-background/80 py-2 backdrop-blur">
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <div className="flex items-center justify-center gap-4">
+        <Link href="/" className="flex items-center justify-center gap-4">
           <div className="grid size-10 place-items-center">
             <FdLogo width={64} height={64} />
           </div>
 
           <p className="font-heading font-semibold">CRHub</p>
-        </div>
+        </Link>
 
         <div className="flex items-center gap-3">
           <DropdownMenu>
