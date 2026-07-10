@@ -47,7 +47,7 @@ export default function RootLayout({
       )}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-svh flex-col">
         <SessionProvider>
           <ThemeProvider
             attribute="class"
