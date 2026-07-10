@@ -17,6 +17,12 @@ export default async function ContactsPage({
     .range(((page ?? 1) - 1) * 25, (page ?? 1) * 25 - 1)
     .limit(25);
 
+  const { count } = await supabase
+    .from("contacts")
+    .select("id", { count: "exact", head: true });
+
+  const pagesCount = Math.ceil((count ?? 0) / 25);
+
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -31,7 +37,7 @@ export default async function ContactsPage({
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
-      <ContactsTable contacts={contacts || []} />
+      <ContactsTable contacts={contacts || []} pagesCount={pagesCount} />
     </div>
   );
 }

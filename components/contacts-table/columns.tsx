@@ -20,7 +20,8 @@ export const columns: ColumnDef<Contact>[] = [
     header: "Telefon",
   },
   {
-    accessorFn: (row) => row.contact_status[0]?.communication_status ?? "Nepoznat",
+    accessorFn: (row) =>
+      row.contact_status[0]?.communication_status ?? "Nepoznat",
     header: "Status",
   },
 ];

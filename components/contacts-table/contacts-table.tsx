@@ -4,6 +4,8 @@
 import {
   flexRender,
   getCoreRowModel,
+  PaginationState,
+  Updater,
   useReactTable,
 } from "@tanstack/react-table";
 
@@ -15,6 +17,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "../ui/pagination";
 import { columns } from "./columns";
 
 export type Contact = {
@@ -38,13 +51,48 @@ export type Contact = {
 
 type ContactsTableProps = {
   contacts: Contact[];
+  pagesCount: number;
 };
 
-export function ContactsTable({ contacts: data }: ContactsTableProps) {
+export function ContactsTable({
+  contacts: data,
+  pagesCount,
+}: ContactsTableProps) {
+  const router = useRouter();
+
+  const searchParams = useSearchParams();
+  const page = searchParams.get("page")
+    ? parseInt(searchParams.get("page")!)
+    : 1;
+
+  const [paginationState, setPaginationState] = useState<PaginationState>({
+    pageIndex: page - 1,
+    pageSize: 25,
+  });
+
+  const handlePaginationChange = (updater: Updater<PaginationState>) => {
+    const newState =
+      typeof updater === "function" ? updater(paginationState) : updater;
+
+    setPaginationState(newState);
+
+    const params = new URLSearchParams(searchParams);
+    params.set("page", (newState.pageIndex + 1).toString());
+    router.push(`?${params.toString()}`);
+  };
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    pageCount: pagesCount,
+    autoResetPageIndex: false,
+    onPaginationChange: handlePaginationChange,
+
+    state: {
+      pagination: paginationState,
+    },
   });
 
   return (
@@ -95,6 +143,67 @@ export function ContactsTable({ contacts: data }: ContactsTableProps) {
           )}
         </TableBody>
       </Table>
+
+      <Pagination className="my-4">
+        <PaginationContent>
+          {table.getState().pagination.pageIndex >= 1 && (
+            <PaginationItem>
+              <PaginationLink onClick={() => table.setPageIndex(0)}>
+                <span className="sr-only">First page</span>
+                <ChevronsLeftIcon data-icon="inline-start" />
+              </PaginationLink>
+            </PaginationItem>
+          )}
+
+          <PaginationItem>
+            <PaginationPrevious
+              disabled={!table.getCanPreviousPage()}
+              onClick={() => table.previousPage()}
+              text="Prev"
+            />
+          </PaginationItem>
+
+          {table.getState().pagination.pageIndex - 5 >= 0 && (
+            <PaginationItem>
+              <PaginationLink onClick={() => table.setPageIndex((x) => x - 5)}>
+                {table.getState().pagination.pageIndex - 4}
+              </PaginationLink>
+            </PaginationItem>
+          )}
+
+          <PaginationItem>
+            <PaginationLink isActive>
+              {table.getState().pagination.pageIndex + 1}
+            </PaginationLink>
+          </PaginationItem>
+
+          {table.getState().pagination.pageIndex + 5 < pagesCount && (
+            <PaginationItem>
+              <PaginationLink onClick={() => table.setPageIndex((x) => x + 5)}>
+                {table.getState().pagination.pageIndex + 6}
+              </PaginationLink>
+            </PaginationItem>
+          )}
+
+          <PaginationItem>
+            <PaginationNext
+              disabled={!table.getCanNextPage()}
+              onClick={() => table.nextPage()}
+            />
+          </PaginationItem>
+
+          {table.getState().pagination.pageIndex + 1 < pagesCount && (
+            <PaginationItem>
+              <PaginationLink
+                onClick={() => table.setPageIndex(pagesCount - 1)}
+              >
+                <span className="sr-only">Last page</span>
+                <ChevronsRightIcon data-icon="inline-end" />
+              </PaginationLink>
+            </PaginationItem>
+          )}
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 }
