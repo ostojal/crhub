@@ -23,6 +23,22 @@ export const columns: ColumnDef<Contact>[] = [
     ),
   },
   {
+    id: "job_title",
+    accessorKey: "job_title",
+
+    header: ({ column }) => (
+      <SortableColumnHeader column={column} title="Pozicija" />
+    ),
+  },
+  {
+    id: "city",
+    accessorKey: "city",
+
+    header: ({ column }) => (
+      <SortableColumnHeader column={column} title="Grad" />
+    ),
+  },
+  {
     accessorKey: "email",
     header: "Email",
   },
@@ -32,10 +48,10 @@ export const columns: ColumnDef<Contact>[] = [
   },
   {
     id: "created_at",
-    accessorFn: (row) => format(row.created_at, "dd.MM.yy."),
+    accessorFn: (row) => format(row.created_at, "dd.MM.yyyy."),
 
     header: ({ column }) => (
-      <SortableColumnHeader column={column} title="Datum kreiranja" />
+      <SortableColumnHeader column={column} title="Dodat" />
     ),
   },
   {

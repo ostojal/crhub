@@ -29,7 +29,9 @@ export default async function ContactsPage({
         break;
 
       case "company":
-        query.order("company", { ascending: asc });
+      case "job_title":
+      case "city":
+        query.order(id, { ascending: asc });
         break;
 
       case "created_at":
