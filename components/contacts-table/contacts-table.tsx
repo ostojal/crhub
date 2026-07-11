@@ -5,6 +5,7 @@ import {
   flexRender,
   getCoreRowModel,
   PaginationState,
+  SortingState,
   Updater,
   useReactTable,
 } from "@tanstack/react-table";
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pagination,
   PaginationContent,
@@ -64,11 +65,42 @@ export function ContactsTable({
   const page = searchParams.get("page")
     ? parseInt(searchParams.get("page")!)
     : 1;
+  const sort = searchParams.get("sort") ?? null;
 
   const [paginationState, setPaginationState] = useState<PaginationState>({
     pageIndex: page - 1,
     pageSize: 25,
   });
+  const [sortingState, setSortingState] = useState<SortingState>(
+    sort
+      ? [
+          {
+            id: sort.split(":")[0],
+            desc: sort.split(":")[1] === "desc",
+          },
+        ]
+      : [],
+  );
+
+  useEffect(() => {
+    setPaginationState((prev) => ({
+      ...prev,
+      pageIndex: page - 1,
+    }));
+  }, [page]);
+
+  useEffect(() => {
+    setSortingState(
+      sort
+        ? [
+            {
+              id: sort.split(":")[0],
+              desc: sort.split(":")[1] === "desc",
+            },
+          ]
+        : [],
+    );
+  }, [sort]);
 
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const newState =
@@ -81,17 +113,40 @@ export function ContactsTable({
     router.push(`?${params.toString()}`);
   };
 
+  const handleSortingChange = (updater: Updater<SortingState>) => {
+    const newState = typeof updater === "function" ? updater([]) : updater;
+    const params = new URLSearchParams(searchParams);
+
+    if (newState.length === 0) {
+      params.delete("sort");
+    } else {
+      params.set(
+        "sort",
+        `${newState[0].id}:${newState[0].desc ? "desc" : "asc"}`,
+      );
+    }
+
+    params.delete("page"); // reset page to 1 when sorting changes
+    router.push(`?${params.toString()}`);
+  };
+
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
+
     pageCount: pagesCount,
     autoResetPageIndex: false,
     onPaginationChange: handlePaginationChange,
 
+    onSortingChange: handleSortingChange,
+    manualSorting: true,
+    enableSorting: true,
+
     state: {
       pagination: paginationState,
+      sorting: sortingState,
     },
   });
 

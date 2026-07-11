@@ -4,18 +4,40 @@ import { createClient } from "@/lib/supabase/server";
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: number }>;
+  searchParams: Promise<{ page?: number; sort?: string }>;
 }) {
-  const { page } = await searchParams;
+  const { page, sort } = await searchParams;
 
   const supabase = createClient();
 
-  const { data: contacts, error } = await supabase
+  const query = supabase
     .from("contacts")
-    .select("*, contact_status(communication_status, interest_tag, updated_at)")
-    .order("created_at", { ascending: false })
-    .range(((page ?? 1) - 1) * 25, (page ?? 1) * 25 - 1)
-    .limit(25);
+    .select(
+      "*, contact_status(communication_status, interest_tag, updated_at)",
+    );
+
+  if (sort) {
+    const id = sort.split(":")[0];
+    const order = sort.split(":")[1] === "desc" ? "desc" : "asc";
+    const asc = order === "asc";
+
+    switch (id) {
+      case "name":
+        query
+          .order("first_name", { ascending: asc })
+          .order("last_name", { ascending: asc });
+        break;
+
+      case "company":
+        query.order("company", { ascending: asc });
+        break;
+    }
+  }
+
+  query.order("created_at", { ascending: false });
+  query.range(((page ?? 1) - 1) * 25, (page ?? 1) * 25 - 1).limit(25);
+
+  const { data: contacts, error } = await query;
 
   const { count } = await supabase
     .from("contacts")
