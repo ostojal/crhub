@@ -31,10 +31,15 @@ export default async function ContactsPage({
       case "company":
         query.order("company", { ascending: asc });
         break;
+
+      case "created_at":
+        query.order("created_at", { ascending: asc });
+        break;
     }
+  } else {
+    query.order("created_at", { ascending: false });
   }
 
-  query.order("created_at", { ascending: false });
   query.range(((page ?? 1) - 1) * 25, (page ?? 1) * 25 - 1).limit(25);
 
   const { data: contacts, error } = await query;

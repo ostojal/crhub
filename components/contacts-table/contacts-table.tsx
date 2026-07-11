@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pagination,
   PaginationContent,
@@ -65,22 +65,19 @@ export function ContactsTable({
   const page = searchParams.get("page")
     ? parseInt(searchParams.get("page")!)
     : 1;
-  const sort = searchParams.get("sort") ?? null;
+  const urlSortingState = useMemo(() => {
+    const sort = searchParams.get("sort");
+    return sort
+      ? [{ id: sort.split(":")[0], desc: sort.split(":")[1] === "desc" }]
+      : [{ id: "created_at", desc: true }]; // default
+  }, [searchParams]);
 
   const [paginationState, setPaginationState] = useState<PaginationState>({
     pageIndex: page - 1,
     pageSize: 25,
   });
-  const [sortingState, setSortingState] = useState<SortingState>(
-    sort
-      ? [
-          {
-            id: sort.split(":")[0],
-            desc: sort.split(":")[1] === "desc",
-          },
-        ]
-      : [],
-  );
+  const [sortingState, setSortingState] =
+    useState<SortingState>(urlSortingState);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -90,17 +87,8 @@ export function ContactsTable({
   }, [page]);
 
   useEffect(() => {
-    setSortingState(
-      sort
-        ? [
-            {
-              id: sort.split(":")[0],
-              desc: sort.split(":")[1] === "desc",
-            },
-          ]
-        : [],
-    );
-  }, [sort]);
+    setSortingState(urlSortingState);
+  }, [urlSortingState]);
 
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const newState =
@@ -109,7 +97,13 @@ export function ContactsTable({
     setPaginationState(newState);
 
     const params = new URLSearchParams(searchParams);
-    params.set("page", (newState.pageIndex + 1).toString());
+
+    if (newState.pageIndex === 0) {
+      params.delete("page");
+    } else {
+      params.set("page", (newState.pageIndex + 1).toString());
+    }
+
     router.push(`?${params.toString()}`);
   };
 
@@ -117,7 +111,10 @@ export function ContactsTable({
     const newState = typeof updater === "function" ? updater([]) : updater;
     const params = new URLSearchParams(searchParams);
 
-    if (newState.length === 0) {
+    if (
+      newState.length === 0 ||
+      (newState[0].id === "created_at" && newState[0].desc)
+    ) {
       params.delete("sort");
     } else {
       params.set(
