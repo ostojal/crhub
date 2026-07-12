@@ -242,9 +242,7 @@ export function ContactsTable({
         </div>
 
         <p className="text-end text-sm text-muted-foreground">
-          <span>
-            Prikazano {table.getRowModel().rows.length} od {contactsCount} reda
-          </span>
+          Prikazano {table.getRowModel().rows.length} od {contactsCount} redova
           {table.getFilteredSelectedRowModel().rows.length > 0 &&
             ` (izabrano ${table.getFilteredSelectedRowModel().rows.length})`}
           .

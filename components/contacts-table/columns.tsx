@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
+import { ContactActions } from "./contact-actions";
 import { Contact } from "./contacts-table";
 
 export const columns: ColumnDef<Contact>[] = [
@@ -105,6 +106,12 @@ export const columns: ColumnDef<Contact>[] = [
     accessorFn: (row) =>
       row.contact_status[0]?.communication_status ?? "Nepoznat",
     header: "Status",
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => <ContactActions contact={row.original} />,
+    enableSorting: false,
+    enableHiding: false,
   },
 ];
 
