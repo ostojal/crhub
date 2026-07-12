@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
+import { NotesDialog } from "./notes-dialog";
 
 export function ContactActions({ contact }: { contact: Contact }) {
   return (
@@ -81,10 +82,16 @@ export function ContactActions({ contact }: { contact: Contact }) {
         )}
 
         {contact.notes && (
-          <DropdownMenuItem>
-            <NotebookIcon />
-            Prikaži Note
-          </DropdownMenuItem>
+          <NotesDialog contact={contact}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+              }}
+            >
+              <NotebookIcon />
+              Prikaži Note
+            </DropdownMenuItem>
+          </NotesDialog>
         )}
 
         <DropdownMenuSeparator />
@@ -99,10 +106,16 @@ export function ContactActions({ contact }: { contact: Contact }) {
           Promeni Status
         </DropdownMenuItem>
 
-        <DropdownMenuItem>
-          <NotebookPenIcon />
-          Promeni Note
-        </DropdownMenuItem>
+        <NotesDialog contact={contact} defaultEditing>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+            }}
+          >
+            <NotebookPenIcon />
+            Promeni Note
+          </DropdownMenuItem>
+        </NotesDialog>
 
         <DropdownMenuItem>
           <UserRoundPlusIcon />
