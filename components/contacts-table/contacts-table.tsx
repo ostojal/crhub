@@ -8,6 +8,7 @@ import {
   SortingState,
   Updater,
   useReactTable,
+  VisibilityState,
 } from "@tanstack/react-table";
 
 import {
@@ -18,9 +19,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
+import { ChevronsLeftIcon, ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Input } from "../ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -29,7 +38,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "../ui/pagination";
-import { columns } from "./columns";
+import { columnIdToLabel, columns } from "./columns";
+import { ContactBulkActions } from "./contact-bulk-actions";
 
 export type Contact = {
   id: string;
@@ -52,19 +62,25 @@ export type Contact = {
 
 type ContactsTableProps = {
   contacts: Contact[];
-  pagesCount: number;
+  contactsCount: number;
 };
 
 export function ContactsTable({
   contacts: data,
-  pagesCount,
+  contactsCount,
 }: ContactsTableProps) {
   const router = useRouter();
+  const pagesCount = useMemo(
+    () => Math.ceil(contactsCount / 25),
+    [contactsCount],
+  );
 
   const searchParams = useSearchParams();
-  const page = searchParams.get("page")
-    ? parseInt(searchParams.get("page")!)
-    : 1;
+  const page = useMemo(
+    () => (searchParams.get("page") ? parseInt(searchParams.get("page")!) : 1),
+    [searchParams],
+  );
+  const searchQuery = searchParams.get("q") ?? "";
   const urlSortingState = useMemo(() => {
     const sort = searchParams.get("sort");
     return sort
@@ -78,6 +94,9 @@ export function ContactsTable({
   });
   const [sortingState, setSortingState] =
     useState<SortingState>(urlSortingState);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  const [searchValue, setSearchValue] = useState(searchQuery);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -90,11 +109,19 @@ export function ContactsTable({
     setSortingState(urlSortingState);
   }, [urlSortingState]);
 
+  useEffect(() => {
+    setSearchValue(searchQuery);
+  }, [searchQuery]);
+
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const newState =
       typeof updater === "function" ? updater(paginationState) : updater;
 
     setPaginationState(newState);
+
+    // todo: allow selection across pages
+    // todo: persist?
+    setRowSelection({}); // reset row selection when page changes
 
     const params = new URLSearchParams(searchParams);
 
@@ -127,6 +154,21 @@ export function ContactsTable({
     router.push(`?${params.toString()}`);
   };
 
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const params = new URLSearchParams(searchParams);
+
+    if (searchValue.trim()) {
+      params.set("q", searchValue.trim());
+    } else {
+      params.delete("q");
+    }
+
+    params.delete("page");
+    router.push(`?${params.toString()}`);
+  };
+
   const table = useReactTable({
     data,
     columns,
@@ -141,15 +183,82 @@ export function ContactsTable({
     manualSorting: true,
     enableSorting: true,
 
+    onColumnVisibilityChange: setColumnVisibility,
+
+    onRowSelectionChange: setRowSelection,
+
     state: {
       pagination: paginationState,
       sorting: sortingState,
+      columnVisibility,
+      rowSelection,
     },
   });
 
   return (
-    <div className="overflow-hidden rounded-md border">
-      <Table>
+    <div className="space-y-1 overflow-hidden">
+      <div className="flex items-center">
+        <form
+          onSubmit={handleSearchSubmit}
+          action=""
+          className="flex w-full max-w-sm gap-2"
+        >
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Filtriraj kontakte..."
+          />
+          <Button type="submit" variant="outline" size="icon">
+            <SearchIcon />
+          </Button>
+        </form>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-max">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                    className="min-w-max"
+                  >
+                    {columnIdToLabel(column.id)}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="mt-2 flex items-end justify-between min-h-8">
+        <p className="text-end text-sm text-muted-foreground">
+          Prikazano {table.getRowModel().rows.length} od {contactsCount} redova
+          {table.getFilteredSelectedRowModel().rows.length > 0 &&
+            ` (izabrano ${table.getFilteredSelectedRowModel().rows.length})`}
+          .
+        </p>
+
+        {table.getFilteredSelectedRowModel().rows.length > 0 && (
+          <ContactBulkActions
+            contacts={table
+              .getFilteredSelectedRowModel()
+              .rows.map((x) => x.original)}
+          />
+        )}
+      </div>
+
+      <Table className="rounded-md border">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
@@ -177,11 +286,7 @@ export function ContactsTable({
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 capitalize">
-                    {cell.getValue() ? (
-                      flexRender(cell.column.columnDef.cell, cell.getContext())
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
@@ -196,7 +301,7 @@ export function ContactsTable({
         </TableBody>
       </Table>
 
-      <Pagination className="my-4">
+      <Pagination className="mt-4">
         <PaginationContent>
           {table.getState().pagination.pageIndex >= 1 && (
             <PaginationItem>

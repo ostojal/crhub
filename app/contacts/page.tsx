@@ -1,12 +1,13 @@
 import { ContactsTable } from "@/components/contacts-table/contacts-table";
+import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: number; sort?: string }>;
+  searchParams: Promise<{ page?: number; sort?: string; q?: string }>;
 }) {
-  const { page, sort } = await searchParams;
+  const { page, sort, q } = await searchParams;
 
   const supabase = createClient();
 
@@ -15,6 +16,13 @@ export default async function ContactsPage({
     .select(
       "*, contact_status(communication_status, interest_tag, updated_at)",
     );
+
+  const searchTerm = q?.trim();
+  const searchFilter = createSearchFilter(searchTerm);
+
+  if (searchFilter) {
+    applyFilter(query, searchFilter);
+  }
 
   if (sort) {
     const id = sort.split(":")[0];
@@ -46,11 +54,16 @@ export default async function ContactsPage({
 
   const { data: contacts, error } = await query;
 
-  const { count } = await supabase
-    .from("contacts")
-    .select("id", { count: "exact", head: true });
+  const countQuery = supabase.from("contacts").select("id", {
+    count: "exact",
+    head: true,
+  });
 
-  const pagesCount = Math.ceil((count ?? 0) / 25);
+  if (searchFilter) {
+    applyFilter(countQuery, searchFilter);
+  }
+
+  const { count } = await countQuery;
 
   if (error) {
     return (
@@ -63,10 +76,10 @@ export default async function ContactsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
-      <ContactsTable contacts={contacts || []} pagesCount={pagesCount} />
+      <ContactsTable contacts={contacts || []} contactsCount={count ?? 0} />
     </div>
   );
 }
