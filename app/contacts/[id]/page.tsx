@@ -62,7 +62,20 @@ export default async function ContactDetailPage({
   const backLabel = me.role === "user" ? "Moji kontakti" : "Kontakti";
 
   const fields: { label: string; value: React.ReactNode; copy?: string }[] = [
-    { label: "Firma", value: contact.company },
+    {
+      label: "Firma",
+      value:
+        contact.company && me.role === "admin" ? (
+          <Link
+            href={`/firme/${encodeURIComponent(contact.company)}`}
+            className="underline-offset-4 hover:underline"
+          >
+            {contact.company}
+          </Link>
+        ) : (
+          contact.company
+        ),
+    },
     { label: "Pozicija", value: contact.job_title },
     { label: "Grad", value: contact.city },
     { label: "Email", value: contact.email, copy: contact.email ?? undefined },

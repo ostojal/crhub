@@ -6,6 +6,7 @@ import { formatPhoneNumber } from "@/lib/format";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { NotebookTextIcon } from "lucide-react";
+import Link from "next/link";
 import {
   ContactActions,
   type ContactActionHandlers,
@@ -96,7 +97,21 @@ export function buildContactColumns({
     header: ({ column }) => (
       <SortableColumnHeader column={column} title="Firma" />
     ),
-    cell: ({ getValue }) => dashValue(getValue()),
+    cell: ({ getValue }) => {
+      const value = getValue<string | null>();
+      // Stranica firme je dostupna samo adminu
+      if (viewer === "admin" && value) {
+        return (
+          <Link
+            href={`/firme/${encodeURIComponent(value)}`}
+            className="underline-offset-4 hover:underline"
+          >
+            {value}
+          </Link>
+        );
+      }
+      return dashValue(value);
+    },
   };
 
   const jobTitle: ColumnDef<ContactRow> = {
@@ -144,7 +159,12 @@ export function buildContactColumns({
       cell: ({ row, cell }) => {
         return (
           <div className="flex items-center gap-2">
-            {dashValue(cell.getValue<string>())}
+            <Link
+              href={`/contacts/${row.original.id}`}
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {dashValue(cell.getValue<string>())}
+            </Link>
             {row.original.notes && (
               <NotebookTextIcon className="size-4 text-muted-foreground" />
             )}

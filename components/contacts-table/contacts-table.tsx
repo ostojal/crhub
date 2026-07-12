@@ -36,7 +36,7 @@ import {
   SearchIcon,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -129,6 +129,7 @@ export function ContactsTable({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
   const [searchValue, setSearchValue] = useState(searchQuery);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
   const [formTarget, setFormTarget] = useState<
@@ -148,7 +149,10 @@ export function ContactsTable({
     setSortingState(urlSortingState);
   }, [urlSortingState]);
 
+  // Sinhronizuj input iz URL-a (back/forward navigacija), ali nikad dok
+  // korisnik kuca — inače odgovor servera pregazi sveže otkucana slova
   useEffect(() => {
+    if (document.activeElement === searchInputRef.current) return;
     setSearchValue(searchQuery);
   }, [searchQuery]);
 
@@ -226,7 +230,8 @@ export function ContactsTable({
       }
 
       params.delete("page");
-      router.push(`?${params.toString()}`);
+      // replace + bez skrolovanja: kucanje ne pravi istoriju niti pomera stranu
+      router.replace(`?${params.toString()}`, { scroll: false });
     }, 350);
 
     return () => clearTimeout(handle);
@@ -264,6 +269,7 @@ export function ContactsTable({
         <div className="relative w-full max-w-sm">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             placeholder="Filtriraj kontakte..."
