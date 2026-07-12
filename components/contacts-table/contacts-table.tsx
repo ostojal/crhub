@@ -61,14 +61,18 @@ export type Contact = {
 
 type ContactsTableProps = {
   contacts: Contact[];
-  pagesCount: number;
+  contactsCount: number;
 };
 
 export function ContactsTable({
   contacts: data,
-  pagesCount,
+  contactsCount,
 }: ContactsTableProps) {
   const router = useRouter();
+  const pagesCount = useMemo(
+    () => Math.ceil(contactsCount / 25),
+    [contactsCount],
+  );
 
   const searchParams = useSearchParams();
   const page = useMemo(
@@ -192,48 +196,59 @@ export function ContactsTable({
 
   return (
     <div className="space-y-1 overflow-hidden">
-      <div className="flex items-center py-4">
-        <form
-          onSubmit={handleSearchSubmit}
-          action=""
-          className="flex w-full max-w-sm gap-2"
-        >
-          <Input
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Filtriraj kontakte..."
-          />
-          <Button type="submit" variant="outline" size="icon">
-            <SearchIcon />
-          </Button>
-        </form>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns
+      <div className="space-y-1 py-4">
+        <div className="flex items-center">
+          <form
+            onSubmit={handleSearchSubmit}
+            action=""
+            className="flex w-full max-w-sm gap-2"
+          >
+            <Input
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Filtriraj kontakte..."
+            />
+            <Button type="submit" variant="outline" size="icon">
+              <SearchIcon />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-max">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                    className="min-w-max"
-                  >
-                    {columnIdToLabel(column.id)}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </form>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-max">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                      className="min-w-max"
+                    >
+                      {columnIdToLabel(column.id)}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <p className="text-end text-sm text-muted-foreground">
+          <span>
+            Prikazano {table.getRowModel().rows.length} od {contactsCount} reda
+          </span>
+          {table.getFilteredSelectedRowModel().rows.length > 0 &&
+            ` (izabrano ${table.getFilteredSelectedRowModel().rows.length})`}
+          .
+        </p>
       </div>
 
       <Table className="rounded-md border">
@@ -279,7 +294,7 @@ export function ContactsTable({
         </TableBody>
       </Table>
 
-      <Pagination className="my-4">
+      <Pagination className="mt-4">
         <PaginationContent>
           {table.getState().pagination.pageIndex >= 1 && (
             <PaginationItem>

@@ -65,8 +65,6 @@ export default async function ContactsPage({
 
   const { count } = await countQuery;
 
-  const pagesCount = Math.ceil((count ?? 0) / 25);
-
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -81,7 +79,7 @@ export default async function ContactsPage({
     <div className="mx-auto w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
-      <ContactsTable contacts={contacts || []} pagesCount={pagesCount} />
+      <ContactsTable contacts={contacts || []} contactsCount={count ?? 0} />
     </div>
   );
 }
