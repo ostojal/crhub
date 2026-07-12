@@ -1,88 +1,171 @@
+import { Checkbox } from "@/components/ui/checkbox";
+import { dashValue, SortableColumnHeader } from "@/components/data-table";
 import { formatPhoneNumber } from "@/lib/format";
-import { Column, ColumnDef } from "@tanstack/react-table";
-import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
-import { Button } from "../ui/button";
-import { Contact } from "./contacts-table";
+import type { Role } from "@/lib/constants";
+import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
+import { ContactRowActions } from "./row-actions";
 
-export const columns: ColumnDef<Contact>[] = [
-  {
-    id: "name",
-    accessorFn: (row) =>
-      [row.first_name, row.last_name].filter(Boolean).join(" "),
+export type AssigneeOption = {
+  id: number;
+  full_name: string | null;
+  email: string | null;
+};
 
-    header: ({ column }) => (
-      <SortableColumnHeader column={column} title="Ime i Prezime" />
+export type ContactAssignment = {
+  user_id: number | null;
+  users: { id: number; full_name: string | null } | null;
+};
+
+// Editor dobija samo id, company, job_title i dodelu — PII polja postoje
+// isključivo u adminovom SELECT-u i zato su opciona
+export type ContactRow = {
+  id: number;
+  company: string | null;
+  job_title: string | null;
+  assignments: ContactAssignment[];
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  mobile_phone?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  contact_status?: {
+    communication_status: string | null;
+    interest_tag: string | null;
+    updated_at: string;
+  }[];
+};
+
+export function getAssigneeName(row: ContactRow): string | null {
+  return row.assignments[0]?.users?.full_name ?? null;
+}
+
+export function isAssigned(row: ContactRow): boolean {
+  return !!row.assignments[0]?.users;
+}
+
+type BuildColumnsOptions = {
+  viewer: Extract<Role, "admin" | "editor">;
+  onAssign: (contact: ContactRow) => void;
+};
+
+export function buildContactColumns({
+  viewer,
+  onAssign,
+}: BuildColumnsOptions): ColumnDef<ContactRow>[] {
+  const select: ColumnDef<ContactRow> = {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Izaberi sve na stranici"
+      />
     ),
-  },
-  {
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Izaberi red"
+      />
+    ),
+    enableSorting: false,
+  };
+
+  const company: ColumnDef<ContactRow> = {
     id: "company",
     accessorKey: "company",
-
     header: ({ column }) => (
       <SortableColumnHeader column={column} title="Firma" />
     ),
-  },
-  {
+    cell: ({ getValue }) => dashValue(getValue()),
+  };
+
+  const jobTitle: ColumnDef<ContactRow> = {
     id: "job_title",
     accessorKey: "job_title",
-
     header: ({ column }) => (
       <SortableColumnHeader column={column} title="Pozicija" />
     ),
-  },
-  {
-    id: "city",
-    accessorKey: "city",
+    cell: ({ getValue }) => dashValue(getValue()),
+  };
 
-    header: ({ column }) => (
-      <SortableColumnHeader column={column} title="Grad" />
+  const assignee: ColumnDef<ContactRow> = {
+    id: "assignee",
+    accessorFn: (row) => getAssigneeName(row),
+    header: "Dodeljen",
+    cell: ({ getValue }) => dashValue(getValue()),
+  };
+
+  const actions: ColumnDef<ContactRow> = {
+    id: "actions",
+    header: () => <span className="sr-only">Akcije</span>,
+    cell: ({ row }) => (
+      <ContactRowActions contact={row.original} onAssign={onAssign} />
     ),
-  },
-  {
-    accessorKey: "email",
-    header: "Email",
-  },
-  {
-    accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone),
-    header: "Telefon",
-  },
-  {
-    id: "created_at",
-    accessorFn: (row) => format(row.created_at, "dd.MM.yyyy."),
+    enableSorting: false,
+  };
 
-    header: ({ column }) => (
-      <SortableColumnHeader column={column} title="Dodat" />
-    ),
-  },
-  {
-    accessorFn: (row) =>
-      row.contact_status[0]?.communication_status ?? "Nepoznat",
-    header: "Status",
-  },
-];
+  if (viewer === "editor") {
+    return [select, company, jobTitle, assignee, actions];
+  }
 
-function SortableColumnHeader({
-  column,
-  title,
-}: {
-  column: Column<Contact, unknown>;
-  title: string;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-      className="w-full justify-between"
-    >
-      {title}
-      {column.getIsSorted() === "asc" ? (
-        <ChevronUp className="ml-2 size-4" />
-      ) : column.getIsSorted() === "desc" ? (
-        <ChevronDown className="ml-2 size-4" />
-      ) : (
-        <ChevronsUpDown className="ml-2 size-4 text-muted-foreground/70" />
-      )}
-    </Button>
-  );
+  return [
+    select,
+    {
+      id: "name",
+      accessorFn: (row) =>
+        [row.first_name, row.last_name].filter(Boolean).join(" "),
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Ime i Prezime" />
+      ),
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    company,
+    jobTitle,
+    {
+      id: "city",
+      accessorKey: "city",
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Grad" />
+      ),
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    {
+      id: "email",
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    {
+      id: "phone",
+      accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone),
+      header: "Telefon",
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    {
+      id: "created_at",
+      accessorFn: (row) =>
+        row.created_at ? format(row.created_at, "dd.MM.yyyy.") : null,
+      header: ({ column }) => (
+        <SortableColumnHeader column={column} title="Dodat" />
+      ),
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    {
+      id: "status",
+      accessorFn: (row) =>
+        row.contact_status?.[0]?.communication_status ?? null,
+      header: "Status",
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    assignee,
+    actions,
+  ];
 }

@@ -19,6 +19,12 @@ export const NAV_LINKS: Record<Role, NavLink[]> = {
       description: "Uloge i pristup članova tima",
     },
   ],
-  editor: [],
+  editor: [
+    {
+      href: "/contacts",
+      label: "Kontakti",
+      description: "Pregled firmi i dodela kontakata timu",
+    },
+  ],
   user: [],
 };
