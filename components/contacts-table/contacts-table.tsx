@@ -90,6 +90,7 @@ export function ContactsTable({
   const [sortingState, setSortingState] =
     useState<SortingState>(urlSortingState);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
   const [searchValue, setSearchValue] = useState(searchQuery);
 
   useEffect(() => {
@@ -112,6 +113,10 @@ export function ContactsTable({
       typeof updater === "function" ? updater(paginationState) : updater;
 
     setPaginationState(newState);
+
+    // todo: allow selection across pages
+    // todo: persist?
+    setRowSelection({}); // reset row selection when page changes
 
     const params = new URLSearchParams(searchParams);
 
@@ -175,10 +180,13 @@ export function ContactsTable({
 
     onColumnVisibilityChange: setColumnVisibility,
 
+    onRowSelectionChange: setRowSelection,
+
     state: {
       pagination: paginationState,
       sorting: sortingState,
       columnVisibility,
+      rowSelection,
     },
   });
 
@@ -256,11 +264,7 @@ export function ContactsTable({
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="px-4 capitalize">
-                    {cell.getValue() ? (
-                      flexRender(cell.column.columnDef.cell, cell.getContext())
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
