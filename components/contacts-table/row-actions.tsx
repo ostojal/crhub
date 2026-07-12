@@ -5,20 +5,36 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { unassignContact } from "@/lib/actions/assignments";
-import { MoreHorizontalIcon, UserMinusIcon, UserPlusIcon } from "lucide-react";
+import {
+  MoreHorizontalIcon,
+  PencilIcon,
+  TagIcon,
+  Trash2Icon,
+  UserMinusIcon,
+  UserPlusIcon,
+} from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { type ContactRow, isAssigned } from "./columns";
 
+export type AdminRowHandlers = {
+  onEdit: (contact: ContactRow) => void;
+  onEditStatus: (contact: ContactRow) => void;
+  onDelete: (contact: ContactRow) => void;
+};
+
 export function ContactRowActions({
   contact,
   onAssign,
+  adminHandlers,
 }: {
   contact: ContactRow;
   onAssign: (contact: ContactRow) => void;
+  adminHandlers?: AdminRowHandlers;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -56,6 +72,29 @@ export function ContactRowActions({
             <UserMinusIcon />
             Ukloni dodelu
           </DropdownMenuItem>
+        )}
+
+        {adminHandlers && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => adminHandlers.onEdit(contact)}>
+              <PencilIcon />
+              Izmeni podatke
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => adminHandlers.onEditStatus(contact)}
+            >
+              <TagIcon />
+              Izmeni status
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => adminHandlers.onDelete(contact)}
+            >
+              <Trash2Icon />
+              Obriši
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

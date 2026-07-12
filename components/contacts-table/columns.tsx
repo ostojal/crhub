@@ -4,7 +4,7 @@ import { formatPhoneNumber } from "@/lib/format";
 import type { Role } from "@/lib/constants";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { ContactRowActions } from "./row-actions";
+import { type AdminRowHandlers, ContactRowActions } from "./row-actions";
 
 export type AssigneeOption = {
   id: number;
@@ -50,11 +50,13 @@ export function isAssigned(row: ContactRow): boolean {
 type BuildColumnsOptions = {
   viewer: Extract<Role, "admin" | "editor">;
   onAssign: (contact: ContactRow) => void;
+  adminHandlers?: AdminRowHandlers;
 };
 
 export function buildContactColumns({
   viewer,
   onAssign,
+  adminHandlers,
 }: BuildColumnsOptions): ColumnDef<ContactRow>[] {
   const select: ColumnDef<ContactRow> = {
     id: "select",
@@ -107,7 +109,11 @@ export function buildContactColumns({
     id: "actions",
     header: () => <span className="sr-only">Akcije</span>,
     cell: ({ row }) => (
-      <ContactRowActions contact={row.original} onAssign={onAssign} />
+      <ContactRowActions
+        contact={row.original}
+        onAssign={onAssign}
+        adminHandlers={adminHandlers}
+      />
     ),
     enableSorting: false,
   };

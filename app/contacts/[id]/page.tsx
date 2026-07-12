@@ -1,3 +1,4 @@
+import { ContactAdminActions } from "@/components/contacts/contact-admin-actions";
 import { InteractionsList } from "@/components/interactions/interactions-list";
 import { LogInteractionButton } from "@/components/interactions/log-interaction-button";
 import { Badge } from "@/components/ui/badge";
@@ -102,7 +103,28 @@ export default async function ContactDetailPage({
           </div>
         </div>
 
-        <LogInteractionButton contactId={contact.id} contactName={name} />
+        <div className="flex flex-wrap gap-2">
+          {me.role === "admin" && (
+            <ContactAdminActions
+              contact={{
+                id: contact.id,
+                first_name: contact.first_name,
+                last_name: contact.last_name,
+                company: contact.company,
+                job_title: contact.job_title,
+                email: contact.email,
+                phone: contact.phone,
+                mobile_phone: contact.mobile_phone,
+                city: contact.city,
+                notes: contact.notes,
+              }}
+              contactName={name}
+              currentStatus={status?.communication_status ?? null}
+              currentTag={status?.interest_tag ?? null}
+            />
+          )}
+          <LogInteractionButton contactId={contact.id} contactName={name} />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

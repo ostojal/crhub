@@ -1,10 +1,16 @@
 "use client";
 
 import { DataTable, type DefaultSort } from "@/components/data-table";
+import {
+  type ContactEditable,
+  ContactFormDialog,
+} from "@/components/contacts/contact-form-dialog";
+import { DeleteContactDialog } from "@/components/contacts/delete-contact-dialog";
+import { EditStatusDialog } from "@/components/contacts/edit-status-dialog";
 import { Button } from "@/components/ui/button";
 import type { Role } from "@/lib/constants";
 import type { Table as TanstackTable } from "@tanstack/react-table";
-import { UserPlusIcon } from "lucide-react";
+import { PlusIcon, UserPlusIcon } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { AssignDialog, type AssignTarget } from "./assign-dialog";
 import {
@@ -14,6 +20,27 @@ import {
 } from "./columns";
 
 const MAX_BULK = 25;
+
+function contactName(contact: ContactRow): string {
+  return (
+    [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"
+  );
+}
+
+function toEditable(contact: ContactRow): ContactEditable {
+  return {
+    id: contact.id,
+    first_name: contact.first_name ?? null,
+    last_name: contact.last_name ?? null,
+    company: contact.company,
+    job_title: contact.job_title,
+    email: contact.email ?? null,
+    phone: contact.phone ?? null,
+    mobile_phone: contact.mobile_phone ?? null,
+    city: contact.city ?? null,
+    notes: contact.notes ?? null,
+  };
+}
 
 export function ContactsView({
   viewer,
@@ -27,27 +54,50 @@ export function ContactsView({
   pagesCount: number;
 }) {
   const [target, setTarget] = useState<AssignTarget | null>(null);
+  const [formTarget, setFormTarget] = useState<
+    { mode: "create" } | { mode: "edit"; contact: ContactRow } | null
+  >(null);
+  const [statusTarget, setStatusTarget] = useState<ContactRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ContactRow | null>(null);
   const tableRef = useRef<TanstackTable<ContactRow> | null>(null);
+
+  const isAdmin = viewer === "admin";
 
   const columns = useMemo(
     () =>
       buildContactColumns({
         viewer,
         onAssign: (contact) => setTarget({ kind: "single", contact }),
+        adminHandlers: isAdmin
+          ? {
+              onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
+              onEditStatus: setStatusTarget,
+              onDelete: setDeleteTarget,
+            }
+          : undefined,
       }),
-    [viewer],
+    [viewer, isAdmin],
   );
 
   const defaultSort: DefaultSort = useMemo(
     () =>
-      viewer === "admin"
+      isAdmin
         ? { id: "created_at", desc: true }
         : { id: "company", desc: false },
-    [viewer],
+    [isAdmin],
   );
 
   return (
     <>
+      {isAdmin && (
+        <div className="mb-4 flex justify-end">
+          <Button onClick={() => setFormTarget({ mode: "create" })}>
+            <PlusIcon data-icon="inline-start" />
+            Novi kontakt
+          </Button>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={contacts}
@@ -95,6 +145,38 @@ export function ContactsView({
           tableRef.current?.resetRowSelection();
         }}
       />
+
+      {formTarget && (
+        <ContactFormDialog
+          key={formTarget.mode === "edit" ? formTarget.contact.id : "create"}
+          contact={
+            formTarget.mode === "edit" ? toEditable(formTarget.contact) : null
+          }
+          onClose={() => setFormTarget(null)}
+        />
+      )}
+
+      {statusTarget && (
+        <EditStatusDialog
+          key={statusTarget.id}
+          contactId={statusTarget.id}
+          contactName={contactName(statusTarget)}
+          currentStatus={
+            statusTarget.contact_status?.[0]?.communication_status ?? null
+          }
+          currentTag={statusTarget.contact_status?.[0]?.interest_tag ?? null}
+          onClose={() => setStatusTarget(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteContactDialog
+          key={deleteTarget.id}
+          contactId={deleteTarget.id}
+          contactName={contactName(deleteTarget)}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
     </>
   );
 }
