@@ -1,4 +1,7 @@
+"use client";
+
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -10,11 +13,11 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { Textarea } from "../ui/textarea";
-import { Contact } from "./contacts-table";
+import { contactName, type ContactRow } from "./columns";
 import { editNote } from "./edit-note";
 
 type NotesDialogProps = {
-  contact: Contact;
+  contact: ContactRow;
   defaultEditing?: boolean;
   children: React.ReactNode;
 };
@@ -26,7 +29,8 @@ export function NotesDialog({
 }: NotesDialogProps) {
   const [editing, setEditing] = useState(false);
 
-  if (!contact.notes) {
+  // Bez beleške nema šta da se prikaže, ali u edit režimu može da se doda
+  if (!contact.notes && !defaultEditing) {
     return null;
   }
 
@@ -42,22 +46,26 @@ export function NotesDialog({
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {contact.first_name} {contact.last_name} - Notes
-          </DialogTitle>
+          <DialogTitle>{contactName(contact)} - Notes</DialogTitle>
         </DialogHeader>
 
         <form
           className="space-y-4"
-          action={(e) => {
+          action={async (formData) => {
             if (!editing) return;
 
-            const newNote = e.get("note") as string;
-            if (newNote.trim() === contact.notes?.trim()) {
+            const newNote = String(formData.get("note") ?? "").trim();
+            if (newNote === (contact.notes ?? "").trim()) {
               return;
             }
 
-            editNote(contact.id, newNote.trim());
+            const result = await editNote(contact.id, newNote);
+
+            if (result.ok) {
+              toast.success(result.message);
+            } else {
+              toast.error(result.error);
+            }
           }}
         >
           {editing && (

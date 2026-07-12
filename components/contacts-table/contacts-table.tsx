@@ -12,6 +12,15 @@ import {
 } from "@tanstack/react-table";
 
 import {
+  type ContactEditable,
+  ContactFormDialog,
+} from "@/components/contacts/contact-form-dialog";
+import { EditStatusDialog } from "@/components/contacts/edit-status-dialog";
+import {
+  type LogContact,
+  LogInteractionDialog,
+} from "@/components/interactions/log-interaction-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,9 +28,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronsLeftIcon, ChevronsRightIcon, SearchIcon } from "lucide-react";
+import type { Role } from "@/lib/constants";
+import {
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  PlusIcon,
+  SearchIcon,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -38,41 +53,58 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "../ui/pagination";
-import { columnIdToLabel, columns } from "./columns";
+import { AssignDialog, type AssignTarget } from "./assign-dialog";
+import {
+  type AssigneeOption,
+  buildContactColumns,
+  columnIdToLabel,
+  contactName,
+  type ContactRow,
+} from "./columns";
 import { ContactBulkActions } from "./contact-bulk-actions";
 
-export type Contact = {
-  id: string;
-  company: string | null;
-  first_name: string;
-  last_name: string;
-  job_title: string | null;
-  email: string | null;
-  phone: string | null;
-  mobile_phone: string | null;
-  city: string | null;
-  notes: string | null;
-  created_at: string;
-  contact_status: {
-    communication_status: string | null;
-    interest_tag: string | null;
-    updated_at: string;
-  }[];
+type ContactsTableProps = {
+  contacts: ContactRow[];
+  contactsCount: number;
+  viewer: Extract<Role, "admin" | "editor">;
+  assignees: AssigneeOption[];
 };
 
-type ContactsTableProps = {
-  contacts: Contact[];
-  contactsCount: number;
-};
+function toEditable(contact: ContactRow): ContactEditable {
+  return {
+    id: contact.id,
+    first_name: contact.first_name ?? null,
+    last_name: contact.last_name ?? null,
+    company: contact.company,
+    job_title: contact.job_title,
+    email: contact.email ?? null,
+    phone: contact.phone ?? null,
+    mobile_phone: contact.mobile_phone ?? null,
+    city: contact.city ?? null,
+    notes: contact.notes ?? null,
+  };
+}
 
 export function ContactsTable({
   contacts: data,
   contactsCount,
+  viewer,
+  assignees,
 }: ContactsTableProps) {
   const router = useRouter();
+  const isAdmin = viewer === "admin";
   const pagesCount = useMemo(
     () => Math.ceil(contactsCount / 25),
     [contactsCount],
+  );
+
+  // Editor podrazumevano gleda po firmi, admin po datumu dodavanja
+  const defaultSort = useMemo(
+    () =>
+      isAdmin
+        ? { id: "created_at", desc: true }
+        : { id: "company", desc: false },
+    [isAdmin],
   );
 
   const searchParams = useSearchParams();
@@ -85,8 +117,8 @@ export function ContactsTable({
     const sort = searchParams.get("sort");
     return sort
       ? [{ id: sort.split(":")[0], desc: sort.split(":")[1] === "desc" }]
-      : [{ id: "created_at", desc: true }]; // default
-  }, [searchParams]);
+      : [defaultSort];
+  }, [searchParams, defaultSort]);
 
   const [paginationState, setPaginationState] = useState<PaginationState>({
     pageIndex: page - 1,
@@ -97,6 +129,14 @@ export function ContactsTable({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
   const [searchValue, setSearchValue] = useState(searchQuery);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [assignTarget, setAssignTarget] = useState<AssignTarget | null>(null);
+  const [formTarget, setFormTarget] = useState<
+    { mode: "create" } | { mode: "edit"; contact: ContactRow } | null
+  >(null);
+  const [statusTarget, setStatusTarget] = useState<ContactRow | null>(null);
+  const [logTarget, setLogTarget] = useState<LogContact | null>(null);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -109,9 +149,28 @@ export function ContactsTable({
     setSortingState(urlSortingState);
   }, [urlSortingState]);
 
+  // Sinhronizuj input iz URL-a (back/forward navigacija), ali nikad dok
+  // korisnik kuca — inače odgovor servera pregazi sveže otkucana slova
   useEffect(() => {
+    if (document.activeElement === searchInputRef.current) return;
     setSearchValue(searchQuery);
   }, [searchQuery]);
+
+  const columns = useMemo(
+    () =>
+      buildContactColumns({
+        viewer,
+        handlers: {
+          onAssign: (contact) =>
+            setAssignTarget({ kind: "single", contact }),
+          onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
+          onEditStatus: setStatusTarget,
+          onLog: (contact) =>
+            setLogTarget({ id: contact.id, name: contactName(contact) }),
+        },
+      }),
+    [viewer],
+  );
 
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const newState =
@@ -140,7 +199,8 @@ export function ContactsTable({
 
     if (
       newState.length === 0 ||
-      (newState[0].id === "created_at" && newState[0].desc)
+      (newState[0].id === defaultSort.id &&
+        newState[0].desc === defaultSort.desc)
     ) {
       params.delete("sort");
     } else {
@@ -154,20 +214,28 @@ export function ContactsTable({
     router.push(`?${params.toString()}`);
   };
 
-  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // Pretraga radi dok se kuca — debounce pa upis u URL (q parametar)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const current = searchParams.get("q") ?? "";
+      const next = searchValue.trim();
+      if (next === current) return;
 
-    const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams);
 
-    if (searchValue.trim()) {
-      params.set("q", searchValue.trim());
-    } else {
-      params.delete("q");
-    }
+      if (next) {
+        params.set("q", next);
+      } else {
+        params.delete("q");
+      }
 
-    params.delete("page");
-    router.push(`?${params.toString()}`);
-  };
+      params.delete("page");
+      // replace + bez skrolovanja: kucanje ne pravi istoriju niti pomera stranu
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }, 350);
+
+    return () => clearTimeout(handle);
+  }, [searchValue, searchParams, router]);
 
   const table = useReactTable({
     data,
@@ -197,21 +265,17 @@ export function ContactsTable({
 
   return (
     <div className="space-y-1 overflow-hidden">
-      <div className="flex items-center">
-        <form
-          onSubmit={handleSearchSubmit}
-          action=""
-          className="flex w-full max-w-sm gap-2"
-        >
+      <div className="flex items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             placeholder="Filtriraj kontakte..."
+            className="pl-9"
           />
-          <Button type="submit" variant="outline" size="icon">
-            <SearchIcon />
-          </Button>
-        </form>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -239,6 +303,13 @@ export function ContactsTable({
               })}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {isAdmin && (
+          <Button onClick={() => setFormTarget({ mode: "create" })}>
+            <PlusIcon data-icon="inline-start" />
+            Novi kontakt
+          </Button>
+        )}
       </div>
 
       <div className="mt-2 flex items-end justify-between min-h-8">
@@ -254,6 +325,11 @@ export function ContactsTable({
             contacts={table
               .getFilteredSelectedRowModel()
               .rows.map((x) => x.original)}
+            viewer={viewer}
+            onAssign={(contacts) =>
+              setAssignTarget({ kind: "bulk", contacts })
+            }
+            onDone={() => table.resetRowSelection()}
           />
         )}
       </div>
@@ -361,6 +437,47 @@ export function ContactsTable({
           )}
         </PaginationContent>
       </Pagination>
+
+      <AssignDialog
+        target={assignTarget}
+        assignees={assignees}
+        onClose={() => setAssignTarget(null)}
+        onSuccess={() => {
+          setAssignTarget(null);
+          table.resetRowSelection();
+        }}
+      />
+
+      {formTarget && (
+        <ContactFormDialog
+          key={formTarget.mode === "edit" ? formTarget.contact.id : "create"}
+          contact={
+            formTarget.mode === "edit" ? toEditable(formTarget.contact) : null
+          }
+          onClose={() => setFormTarget(null)}
+        />
+      )}
+
+      {logTarget && (
+        <LogInteractionDialog
+          key={logTarget.id}
+          contacts={[logTarget]}
+          onClose={() => setLogTarget(null)}
+        />
+      )}
+
+      {statusTarget && (
+        <EditStatusDialog
+          key={statusTarget.id}
+          contactId={statusTarget.id}
+          contactName={contactName(statusTarget)}
+          currentStatus={
+            statusTarget.contact_status?.[0]?.communication_status ?? null
+          }
+          currentTag={statusTarget.contact_status?.[0]?.interest_tag ?? null}
+          onClose={() => setStatusTarget(null)}
+        />
+      )}
     </div>
   );
 }
