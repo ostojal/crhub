@@ -15,11 +15,11 @@ export function ThemeToggle() {
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className="w-full justify-start"
     >
-      <Sun className="dark:hidden" />
-      <span className="dark:hidden">Svetla tema</span>
+      <Moon className="dark:hidden" />
+      <span className="dark:hidden">Tamna tema</span>
 
-      <Moon className="hidden dark:block" />
-      <span className="hidden dark:block">Tamna tema</span>
+      <Sun className="hidden dark:block" />
+      <span className="hidden dark:block">Svetla tema</span>
 
       <span className="sr-only">Toggle theme</span>
     </Button>

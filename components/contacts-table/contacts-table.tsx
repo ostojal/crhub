@@ -20,6 +20,9 @@ import {
   type LogContact,
   LogInteractionDialog,
 } from "@/components/interactions/log-interaction-dialog";
+import { CopyButton } from "@/components/copy-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MobileCard, MobileField } from "@/components/ui/mobile-list";
 import {
   Table,
   TableBody,
@@ -29,14 +32,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Role } from "@/lib/constants";
+import { formatPhoneNumber } from "@/lib/format";
+import { format } from "date-fns";
 import {
   ChevronsLeftIcon,
   ChevronsRightIcon,
+  NotebookTextIcon,
   PlusIcon,
   SearchIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Row } from "@tanstack/react-table";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -60,7 +68,9 @@ import {
   columnIdToLabel,
   contactName,
   type ContactRow,
+  getAssigneeName,
 } from "./columns";
+import { ContactActions, type ContactActionHandlers } from "./contact-actions";
 import { ContactBulkActions } from "./contact-bulk-actions";
 
 type ContactsTableProps = {
@@ -83,6 +93,106 @@ function toEditable(contact: ContactRow): ContactEditable {
     city: contact.city ?? null,
     notes: contact.notes ?? null,
   };
+}
+
+// Mobilni prikaz jednog kontakta — sve u jednom pogledu, bez horizontalnog
+// skrolovanja tabele.
+function ContactMobileCard({
+  row,
+  viewer,
+  handlers,
+}: {
+  row: Row<ContactRow>;
+  viewer: Extract<Role, "admin" | "editor">;
+  handlers: ContactActionHandlers;
+}) {
+  const contact = row.original;
+  const isAdmin = viewer === "admin";
+  const assignee = getAssigneeName(contact);
+  const status = contact.contact_status?.[0]?.communication_status;
+
+  return (
+    <MobileCard className="space-y-2">
+      <div className="flex items-start gap-2">
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Izaberi kontakt"
+          className="mt-1"
+        />
+        <div className="min-w-0 flex-1">
+          {isAdmin ? (
+            <span className="flex items-center gap-2">
+              <Link
+                href={`/contacts/${contact.id}`}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                {contactName(contact)}
+              </Link>
+              {contact.notes && (
+                <NotebookTextIcon className="size-4 shrink-0 text-muted-foreground" />
+              )}
+            </span>
+          ) : (
+            <span className="font-medium">{contact.company ?? "—"}</span>
+          )}
+        </div>
+        <ContactActions contact={contact} viewer={viewer} handlers={handlers} />
+      </div>
+
+      <div className="border-t pt-2">
+        {isAdmin && contact.company && (
+          <MobileField label="Firma">
+            <Link
+              href={`/firme/${encodeURIComponent(contact.company)}`}
+              className="underline-offset-4 hover:underline"
+            >
+              {contact.company}
+            </Link>
+          </MobileField>
+        )}
+        {contact.job_title && (
+          <MobileField label="Pozicija">{contact.job_title}</MobileField>
+        )}
+        {isAdmin && contact.city && (
+          <MobileField label="Grad">{contact.city}</MobileField>
+        )}
+        {isAdmin && contact.email && (
+          <MobileField label="Email">
+            <span className="inline-flex items-center gap-1">
+              {contact.email}
+              <CopyButton value={contact.email} label="Email" />
+            </span>
+          </MobileField>
+        )}
+        {isAdmin && contact.mobile_phone && (
+          <MobileField label="Mobilni">
+            <span className="inline-flex items-center gap-1">
+              {formatPhoneNumber(contact.mobile_phone)}
+              <CopyButton value={contact.mobile_phone} label="Mobilni telefon" />
+            </span>
+          </MobileField>
+        )}
+        {isAdmin && contact.phone && (
+          <MobileField label="Fiksni">
+            <span className="inline-flex items-center gap-1">
+              {formatPhoneNumber(contact.phone)}
+              <CopyButton value={contact.phone} label="Fiksni telefon" />
+            </span>
+          </MobileField>
+        )}
+        {isAdmin && (
+          <MobileField label="Status">{status ?? "Nepoznat"}</MobileField>
+        )}
+        {isAdmin && contact.created_at && (
+          <MobileField label="Dodat">
+            {format(contact.created_at, "dd.MM.yyyy.")}
+          </MobileField>
+        )}
+        <MobileField label="Dodeljen">{assignee ?? "—"}</MobileField>
+      </div>
+    </MobileCard>
+  );
 }
 
 export function ContactsTable({
@@ -156,20 +266,20 @@ export function ContactsTable({
     setSearchValue(searchQuery);
   }, [searchQuery]);
 
+  const handlers: ContactActionHandlers = useMemo(
+    () => ({
+      onAssign: (contact) => setAssignTarget({ kind: "single", contact }),
+      onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
+      onEditStatus: setStatusTarget,
+      onLog: (contact) =>
+        setLogTarget({ id: contact.id, name: contactName(contact) }),
+    }),
+    [],
+  );
+
   const columns = useMemo(
-    () =>
-      buildContactColumns({
-        viewer,
-        handlers: {
-          onAssign: (contact) =>
-            setAssignTarget({ kind: "single", contact }),
-          onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
-          onEditStatus: setStatusTarget,
-          onLog: (contact) =>
-            setLogTarget({ id: contact.id, name: contactName(contact) }),
-        },
-      }),
-    [viewer],
+    () => buildContactColumns({ viewer, handlers }),
+    [viewer, handlers],
   );
 
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
@@ -279,7 +389,7 @@ export function ContactsTable({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
+            <Button variant="outline" className="ml-auto hidden md:inline-flex">
               Columns
             </Button>
           </DropdownMenuTrigger>
@@ -305,7 +415,10 @@ export function ContactsTable({
         </DropdownMenu>
 
         {isAdmin && (
-          <Button onClick={() => setFormTarget({ mode: "create" })}>
+          <Button
+            onClick={() => setFormTarget({ mode: "create" })}
+            className="ml-auto md:ml-0"
+          >
             <PlusIcon data-icon="inline-start" />
             Novi kontakt
           </Button>
@@ -334,7 +447,26 @@ export function ContactsTable({
         )}
       </div>
 
-      <Table className="rounded-md border">
+      <div className="space-y-3 md:hidden">
+        {table.getRowModel().rows?.length ? (
+          table
+            .getRowModel()
+            .rows.map((row) => (
+              <ContactMobileCard
+                key={row.id}
+                row={row}
+                viewer={viewer}
+                handlers={handlers}
+              />
+            ))
+        ) : (
+          <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+            No results.
+          </div>
+        )}
+      </div>
+
+      <Table className="hidden rounded-md border md:table">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>

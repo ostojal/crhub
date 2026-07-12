@@ -6,6 +6,7 @@ import { NAV_LINKS } from "@/lib/nav";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { FdLogo } from "./fd-logo";
+import { LinkPending } from "./link-pending";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -35,14 +36,17 @@ export default async function Navbar() {
               <FdLogo width={64} height={64} />
             </div>
 
-            <p className="font-heading font-semibold">CRHub</p>
+            <p className="font-heading font-semibold">CR HUB</p>
           </Link>
 
           {links.length > 0 && (
             <div className="hidden items-center gap-1 sm:flex">
               {links.map((link) => (
                 <Button key={link.href} variant="ghost" size="sm" asChild>
-                  <Link href={link.href}>{link.label}</Link>
+                  <Link href={link.href}>
+                    {link.label}
+                    <LinkPending />
+                  </Link>
                 </Button>
               ))}
             </div>
@@ -88,8 +92,12 @@ export default async function Navbar() {
                         className="w-full justify-start"
                         asChild
                       >
-                        <Link href={link.href} className="w-full">
+                        <Link
+                          href={link.href}
+                          className="flex w-full items-center"
+                        >
                           <span>{link.label}</span>
+                          <LinkPending />
                         </Link>
                       </Button>
                     </DropdownMenuItem>

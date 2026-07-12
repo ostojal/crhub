@@ -15,8 +15,8 @@ const robotoSlabHeading = Roboto_Slab({
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "CRHub",
-  description: "CRHub",
+  title: "CR HUB",
+  description: "CR HUB",
 
   robots: {
     index: false,
