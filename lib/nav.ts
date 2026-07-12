@@ -26,5 +26,11 @@ export const NAV_LINKS: Record<Role, NavLink[]> = {
       description: "Pregled firmi i dodela kontakata timu",
     },
   ],
-  user: [],
+  user: [
+    {
+      href: "/moji-kontakti",
+      label: "Moji kontakti",
+      description: "Kontakti dodeljeni tebi",
+    },
+  ],
 };
