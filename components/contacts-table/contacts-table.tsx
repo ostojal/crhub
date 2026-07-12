@@ -71,9 +71,10 @@ export function ContactsTable({
   const router = useRouter();
 
   const searchParams = useSearchParams();
-  const page = searchParams.get("page")
-    ? parseInt(searchParams.get("page")!)
-    : 1;
+  const page = useMemo(
+    () => (searchParams.get("page") ? parseInt(searchParams.get("page")!) : 1),
+    [searchParams],
+  );
   const searchQuery = searchParams.get("q") ?? "";
   const urlSortingState = useMemo(() => {
     const sort = searchParams.get("sort");

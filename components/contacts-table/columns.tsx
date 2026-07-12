@@ -1,6 +1,11 @@
 import { formatPhoneNumber } from "@/lib/format";
 import { Column, ColumnDef } from "@tanstack/react-table";
-import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  NotebookTextIcon,
+} from "lucide-react";
 import { Button } from "../ui/button";
 import { Contact } from "./contacts-table";
 import { format } from "date-fns";
@@ -13,6 +18,17 @@ export const columns: ColumnDef<Contact>[] = [
     header: ({ column }) => (
       <SortableColumnHeader column={column} title="Ime i Prezime" />
     ),
+
+    cell: ({ row, cell }) => {
+      return (
+        <div className="flex items-center gap-2">
+          {cell.getValue<string>()}
+          {row.original.notes && (
+            <NotebookTextIcon className="size-4 text-muted-foreground" />
+          )}
+        </div>
+      );
+    },
   },
   {
     id: "company",
