@@ -1,3 +1,4 @@
+import { CopyButton } from "@/components/copy-button";
 import { dashValue, SortableColumnHeader } from "@/components/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Role } from "@/lib/constants";
@@ -165,19 +166,43 @@ export function buildContactColumns({
       id: "email",
       accessorKey: "email",
       header: "Email",
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, getValue }) => (
+        <div className="flex items-center gap-1">
+          {dashValue(getValue())}
+          {row.original.email && (
+            <CopyButton value={row.original.email} label="Email" />
+          )}
+        </div>
+      ),
     },
     {
       id: "mobile_phone",
       header: "Mobilni Telefon",
       accessorFn: (row) => formatPhoneNumber(row.mobile_phone),
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, getValue }) => (
+        <div className="flex items-center gap-1">
+          {dashValue(getValue())}
+          {row.original.mobile_phone && (
+            <CopyButton
+              value={row.original.mobile_phone}
+              label="Mobilni telefon"
+            />
+          )}
+        </div>
+      ),
     },
     {
       id: "phone",
       header: "Fiksni Telefon",
       accessorFn: (row) => formatPhoneNumber(row.phone),
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, getValue }) => (
+        <div className="flex items-center gap-1">
+          {dashValue(getValue())}
+          {row.original.phone && (
+            <CopyButton value={row.original.phone} label="Fiksni telefon" />
+          )}
+        </div>
+      ),
     },
     {
       id: "created_at",

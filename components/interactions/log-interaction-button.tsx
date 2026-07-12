@@ -23,8 +23,7 @@ export function LogInteractionButton({
 
       {open && (
         <LogInteractionDialog
-          contactId={contactId}
-          contactName={contactName}
+          contacts={[{ id: contactId, name: contactName }]}
           onClose={() => setOpen(false)}
         />
       )}

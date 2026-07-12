@@ -1,5 +1,7 @@
+import { CopyButton } from "@/components/copy-button";
 import { dashValue } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatPhoneNumber } from "@/lib/format";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -40,6 +42,27 @@ export function buildMyContactColumns({
 }): ColumnDef<MyContact>[] {
   return [
     {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+    },
+    {
       id: "name",
       accessorFn: (row) => contactDisplayName(row),
       header: "Ime i Prezime",
@@ -68,13 +91,28 @@ export function buildMyContactColumns({
       id: "phone",
       accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone),
       header: "Telefon",
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, getValue }) => {
+        const raw = row.original.phone ?? row.original.mobile_phone;
+        return (
+          <div className="flex items-center gap-1">
+            {dashValue(getValue())}
+            {raw && <CopyButton value={raw} label="Telefon" />}
+          </div>
+        );
+      },
     },
     {
       id: "email",
       accessorKey: "email",
       header: "Email",
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, getValue }) => (
+        <div className="flex items-center gap-1">
+          {dashValue(getValue())}
+          {row.original.email && (
+            <CopyButton value={row.original.email} label="Email" />
+          )}
+        </div>
+      ),
     },
     {
       id: "status",

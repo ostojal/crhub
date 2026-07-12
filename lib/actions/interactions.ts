@@ -13,23 +13,32 @@ import { cleanText, isId, isOneOf } from "@/lib/validate";
 import { revalidatePath } from "next/cache";
 
 const NO_PERMISSION = "Nemaš dozvolu za ovu akciju.";
+const MAX_BULK = 25;
 
 export type LogInteractionInput = {
-  contactId: number;
   type: string;
   notes?: string;
   newStatus?: string;
   interestTag?: string;
 };
 
-export async function logInteraction(
+// Evidentira isto kontaktiranje za jedan ili više kontakata; admin za bilo
+// koji kontakt, user samo za kontakte koji su mu dodeljeni
+export async function logInteractions(
+  contactIds: number[],
   input: LogInteractionInput,
 ): Promise<ActionResult> {
   const me = await checkRole("admin", "user");
   if (!me) return { ok: false, error: NO_PERMISSION };
 
-  const { contactId } = input;
-  if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
+  if (
+    !Array.isArray(contactIds) ||
+    contactIds.length === 0 ||
+    contactIds.length > MAX_BULK ||
+    !contactIds.every(isId)
+  ) {
+    return { ok: false, error: "Neispravan izbor kontakata." };
+  }
 
   if (!isOneOf(input.type, INTERACTION_TYPES)) {
     return { ok: false, error: "Nepoznat tip kontaktiranja." };
@@ -49,53 +58,68 @@ export async function logInteraction(
 
   const supabase = createClient();
 
-  // User sme da evidentira samo za kontakt koji mu je dodeljen
   if (me.role === "user") {
-    const { data: assignment } = await supabase
+    const { data: assignments } = await supabase
       .from("assignments")
-      .select("id")
-      .eq("contact_id", contactId)
-      .eq("user_id", me.id)
-      .limit(1)
-      .maybeSingle();
+      .select("contact_id")
+      .in("contact_id", contactIds)
+      .eq("user_id", me.id);
 
-    if (!assignment) return { ok: false, error: NO_PERMISSION };
+    const assignedIds = new Set(
+      (assignments ?? []).map((a) => a.contact_id),
+    );
+    if (!contactIds.every((id) => assignedIds.has(id))) {
+      return { ok: false, error: NO_PERMISSION };
+    }
   }
 
-  const { error } = await supabase.from("interactions").insert({
-    contact_id: contactId,
-    user_id: me.id,
-    type: input.type,
-    notes,
-  });
+  const { error } = await supabase.from("interactions").insert(
+    contactIds.map((contactId) => ({
+      contact_id: contactId,
+      user_id: me.id,
+      type: input.type,
+      notes,
+    })),
+  );
 
   if (error) {
     return { ok: false, error: "Greška pri evidentiranju kontaktiranja." };
   }
 
   if (newStatus !== undefined || interestTag !== undefined) {
-    const statusOk = await setContactStatus(
-      supabase,
-      contactId,
-      {
-        ...(newStatus !== undefined && { communication_status: newStatus }),
-        ...(interestTag !== undefined && { interest_tag: interestTag }),
-      },
-      me.email,
-    );
+    for (const contactId of contactIds) {
+      const statusOk = await setContactStatus(
+        supabase,
+        contactId,
+        {
+          ...(newStatus !== undefined && { communication_status: newStatus }),
+          ...(interestTag !== undefined && { interest_tag: interestTag }),
+        },
+        me.email,
+      );
 
-    if (!statusOk) {
-      return {
-        ok: false,
-        error: "Kontaktiranje je zabeleženo, ali status nije izmenjen.",
-      };
+      if (!statusOk) {
+        return {
+          ok: false,
+          error: "Kontaktiranje je zabeleženo, ali status nije izmenjen.",
+        };
+      }
     }
   }
 
+  revalidatePath("/");
   revalidatePath("/contacts");
-  revalidatePath(`/contacts/${contactId}`);
+  for (const contactId of contactIds) {
+    revalidatePath(`/contacts/${contactId}`);
+  }
   revalidatePath("/moji-kontakti");
   revalidatePath("/analitika");
 
-  return { ok: true, message: "Kontaktiranje je evidentirano." };
+  return {
+    ok: true,
+    message:
+      contactIds.length === 1
+        ? "Kontaktiranje je evidentirano."
+        : `Evidentirano kontaktiranja: ${contactIds.length}.`,
+  };
 }

@@ -177,7 +177,8 @@ function AssignDialogInner({
             )}
           </div>
 
-          {singleContact && company && (
+          {/* Opseg "cela firma" ima smisla samo kad firma ima više kontakata */}
+          {singleContact && company && (companyInfo?.total ?? 0) > 1 && (
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">Opseg dodele</legend>
               <label className="flex items-center gap-2 text-sm">

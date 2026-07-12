@@ -10,20 +10,14 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const PENDING_ROLE_LABEL = "Na čekanju";
 
-export const INTERACTION_TYPES = [
-  "poziv",
-  "email",
-  "sastanak",
-  "drugo",
-] as const;
+export const INTERACTION_TYPES = ["email", "poziv", "linkedin"] as const;
 
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
 
 export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
-  poziv: "Poziv",
   email: "Email",
-  sastanak: "Sastanak",
-  drugo: "Drugo",
+  poziv: "Poziv",
+  linkedin: "LinkedIn",
 };
 
 // Vrednosti Postgres enuma `public.status` — moraju se poklapati sa bazom

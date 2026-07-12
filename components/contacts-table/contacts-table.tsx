@@ -17,6 +17,10 @@ import {
 } from "@/components/contacts/contact-form-dialog";
 import { EditStatusDialog } from "@/components/contacts/edit-status-dialog";
 import {
+  type LogContact,
+  LogInteractionDialog,
+} from "@/components/interactions/log-interaction-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -131,6 +135,7 @@ export function ContactsTable({
     { mode: "create" } | { mode: "edit"; contact: ContactRow } | null
   >(null);
   const [statusTarget, setStatusTarget] = useState<ContactRow | null>(null);
+  const [logTarget, setLogTarget] = useState<LogContact | null>(null);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -156,6 +161,8 @@ export function ContactsTable({
             setAssignTarget({ kind: "single", contact }),
           onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
           onEditStatus: setStatusTarget,
+          onLog: (contact) =>
+            setLogTarget({ id: contact.id, name: contactName(contact) }),
         },
       }),
     [viewer],
@@ -203,20 +210,27 @@ export function ContactsTable({
     router.push(`?${params.toString()}`);
   };
 
-  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // Pretraga radi dok se kuca — debounce pa upis u URL (q parametar)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      const current = searchParams.get("q") ?? "";
+      const next = searchValue.trim();
+      if (next === current) return;
 
-    const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(searchParams);
 
-    if (searchValue.trim()) {
-      params.set("q", searchValue.trim());
-    } else {
-      params.delete("q");
-    }
+      if (next) {
+        params.set("q", next);
+      } else {
+        params.delete("q");
+      }
 
-    params.delete("page");
-    router.push(`?${params.toString()}`);
-  };
+      params.delete("page");
+      router.push(`?${params.toString()}`);
+    }, 350);
+
+    return () => clearTimeout(handle);
+  }, [searchValue, searchParams, router]);
 
   const table = useReactTable({
     data,
@@ -247,20 +261,15 @@ export function ContactsTable({
   return (
     <div className="space-y-1 overflow-hidden">
       <div className="flex items-center gap-2">
-        <form
-          onSubmit={handleSearchSubmit}
-          action=""
-          className="flex w-full max-w-sm gap-2"
-        >
+        <div className="relative w-full max-w-sm">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchValue}
             onChange={(event) => setSearchValue(event.target.value)}
             placeholder="Filtriraj kontakte..."
+            className="pl-9"
           />
-          <Button type="submit" variant="outline" size="icon">
-            <SearchIcon />
-          </Button>
-        </form>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -440,6 +449,14 @@ export function ContactsTable({
             formTarget.mode === "edit" ? toEditable(formTarget.contact) : null
           }
           onClose={() => setFormTarget(null)}
+        />
+      )}
+
+      {logTarget && (
+        <LogInteractionDialog
+          key={logTarget.id}
+          contacts={[logTarget]}
+          onClose={() => setLogTarget(null)}
         />
       )}
 

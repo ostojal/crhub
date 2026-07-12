@@ -10,6 +10,7 @@ import {
   NotebookIcon,
   NotebookPenIcon,
   PhoneCallIcon,
+  PhoneOutgoingIcon,
   Trash2Icon,
   UserRoundMinus,
   UserRoundPlusIcon,
@@ -49,6 +50,7 @@ export type ContactActionHandlers = {
   onAssign: (contact: ContactRow) => void;
   onEdit: (contact: ContactRow) => void;
   onEditStatus: (contact: ContactRow) => void;
+  onLog: (contact: ContactRow) => void;
 };
 
 export function ContactActions({
@@ -104,6 +106,11 @@ export function ContactActions({
                 <ExternalLinkIcon />
                 Detalji
               </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onSelect={() => handlers.onLog(contact)}>
+              <PhoneOutgoingIcon />
+              Evidentiraj Kontaktiranje
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

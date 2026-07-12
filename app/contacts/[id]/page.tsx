@@ -1,4 +1,5 @@
 import { ContactAdminActions } from "@/components/contacts/contact-admin-actions";
+import { CopyButton } from "@/components/copy-button";
 import { InteractionsList } from "@/components/interactions/interactions-list";
 import { LogInteractionButton } from "@/components/interactions/log-interaction-button";
 import { Badge } from "@/components/ui/badge";
@@ -60,15 +61,20 @@ export default async function ContactDetailPage({
   const backHref = me.role === "user" ? "/moji-kontakti" : "/contacts";
   const backLabel = me.role === "user" ? "Moji kontakti" : "Kontakti";
 
-  const fields: { label: string; value: React.ReactNode }[] = [
+  const fields: { label: string; value: React.ReactNode; copy?: string }[] = [
     { label: "Firma", value: contact.company },
     { label: "Pozicija", value: contact.job_title },
     { label: "Grad", value: contact.city },
-    { label: "Email", value: contact.email },
-    { label: "Telefon", value: formatPhoneNumber(contact.phone) },
+    { label: "Email", value: contact.email, copy: contact.email ?? undefined },
+    {
+      label: "Telefon",
+      value: formatPhoneNumber(contact.phone),
+      copy: contact.phone ?? undefined,
+    },
     {
       label: "Mobilni",
       value: formatPhoneNumber(contact.mobile_phone),
+      copy: contact.mobile_phone ?? undefined,
     },
     {
       label: "Dodat",
@@ -142,9 +148,12 @@ export default async function ContactDetailPage({
                   <dt className="shrink-0 text-muted-foreground">
                     {field.label}
                   </dt>
-                  <dd className="text-right">
+                  <dd className="flex items-center justify-end gap-1 text-right">
                     {field.value || (
                       <span className="text-muted-foreground">-</span>
+                    )}
+                    {field.copy && (
+                      <CopyButton value={field.copy} label={field.label} />
                     )}
                   </dd>
                 </div>
