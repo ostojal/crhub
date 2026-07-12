@@ -184,6 +184,50 @@ export async function deleteContact(
   return { ok: true, message: "Kontakt je obrisan." };
 }
 
+const MAX_BULK = 25;
+
+export async function deleteContacts(
+  contactIds: number[],
+): Promise<ActionResult> {
+  const me = await checkRole("admin");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (
+    !Array.isArray(contactIds) ||
+    contactIds.length === 0 ||
+    contactIds.length > MAX_BULK ||
+    !contactIds.every(isId)
+  ) {
+    return { ok: false, error: "Neispravan izbor kontakata." };
+  }
+
+  const supabase = createClient();
+
+  // Prvo deca (nema kaskadnog brisanja u šemi), pa sami kontakti
+  for (const table of [
+    "interactions",
+    "assignments",
+    "contact_status",
+  ] as const) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .in("contact_id", contactIds);
+
+    if (error) return { ok: false, error: "Greška pri brisanju kontakata." };
+  }
+
+  const { error } = await supabase
+    .from("contacts")
+    .delete()
+    .in("id", contactIds);
+
+  if (error) return { ok: false, error: "Greška pri brisanju kontakata." };
+
+  revalidateContactPaths();
+  return { ok: true, message: `Obrisano kontakata: ${contactIds.length}.` };
+}
+
 export async function updateContactStatus(
   contactId: number,
   status: string,

@@ -185,6 +185,33 @@ export async function assignCompany(
   };
 }
 
+export async function unassignContacts(
+  contactIds: number[],
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "editor");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (
+    !Array.isArray(contactIds) ||
+    contactIds.length === 0 ||
+    contactIds.length > MAX_BULK ||
+    !contactIds.every(isId)
+  ) {
+    return { ok: false, error: "Neispravan izbor kontakata." };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("assignments")
+    .delete()
+    .in("contact_id", contactIds);
+
+  if (error) return { ok: false, error: "Greška pri uklanjanju dodela." };
+
+  revalidateAssignmentPaths();
+  return { ok: true, message: "Dodele su uklonjene." };
+}
+
 export async function unassignContact(
   contactId: number,
 ): Promise<ActionResult> {

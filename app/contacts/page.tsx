@@ -1,10 +1,12 @@
-import { ContactsView } from "@/components/contacts-table/contacts-view";
 import type {
   AssigneeOption,
   ContactRow,
 } from "@/components/contacts-table/columns";
+import { ContactsTable } from "@/components/contacts-table/contacts-table";
+import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
+import { escapeLike } from "@/lib/validate";
 
 const PAGE_SIZE = 25;
 
@@ -15,15 +17,23 @@ const ADMIN_SELECT =
 const EDITOR_SELECT =
   "id, company, job_title, assignments(user_id, users(id, full_name))";
 
+// Editor ne sme da filtrira po PII kolonama, pa za njega q znači samo
+// jednostavnu pretragu firme i pozicije (bez posebne sintakse)
+function editorFilterExpression(term: string): string {
+  const pattern = `%${escapeLike(term.replaceAll('"', ""))}%`;
+  const value = /[,()]/.test(pattern) ? `"${pattern}"` : pattern;
+  return `company.ilike.${value},job_title.ilike.${value}`;
+}
+
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: number; sort?: string }>;
+  searchParams: Promise<{ page?: number; sort?: string; q?: string }>;
 }) {
   const me = await requireRole("admin", "editor");
   const isAdmin = me.role === "admin";
 
-  const { page, sort } = await searchParams;
+  const { page, sort, q } = await searchParams;
 
   const supabase = createClient();
 
@@ -31,12 +41,28 @@ export default async function ContactsPage({
     .from("contacts")
     .select(isAdmin ? ADMIN_SELECT : EDITOR_SELECT);
 
+  const countQuery = supabase.from("contacts").select("id", {
+    count: "exact",
+    head: true,
+  });
+
+  const searchTerm = q?.trim();
+  const searchFilter = isAdmin ? createSearchFilter(searchTerm) : null;
+
   if (isAdmin) {
+    if (searchFilter) {
+      applyFilter(query, searchFilter);
+      applyFilter(countQuery, searchFilter);
+    }
+
     // Najnoviji status prvi, da [0] uvek bude aktuelan red
     query.order("updated_at", {
       referencedTable: "contact_status",
       ascending: false,
     });
+  } else if (searchTerm) {
+    query.or(editorFilterExpression(searchTerm));
+    countQuery.or(editorFilterExpression(searchTerm));
   }
 
   const [sortId, sortOrder] = (sort ?? "").split(":");
@@ -65,12 +91,7 @@ export default async function ContactsPage({
   query.range(((page ?? 1) - 1) * PAGE_SIZE, (page ?? 1) * PAGE_SIZE - 1);
 
   const { data: contacts, error } = await query;
-
-  const { count } = await supabase
-    .from("contacts")
-    .select("id", { count: "exact", head: true });
-
-  const pagesCount = Math.ceil((count ?? 0) / PAGE_SIZE);
+  const { count } = await countQuery;
 
   const { data: assignees } = await supabase
     .from("users")
@@ -89,14 +110,14 @@ export default async function ContactsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
-      <ContactsView
-        viewer={me.role as "admin" | "editor"}
+      <ContactsTable
         contacts={(contacts ?? []) as unknown as ContactRow[]}
+        contactsCount={count ?? 0}
+        viewer={me.role as "admin" | "editor"}
         assignees={(assignees ?? []) as AssigneeOption[]}
-        pagesCount={pagesCount}
       />
     </div>
   );

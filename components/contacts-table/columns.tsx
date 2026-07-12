@@ -1,10 +1,14 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { dashValue, SortableColumnHeader } from "@/components/data-table";
-import { formatPhoneNumber } from "@/lib/format";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Role } from "@/lib/constants";
+import { formatPhoneNumber } from "@/lib/format";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { type AdminRowHandlers, ContactRowActions } from "./row-actions";
+import { NotebookTextIcon } from "lucide-react";
+import {
+  ContactActions,
+  type ContactActionHandlers,
+} from "./contact-actions";
 
 export type AssigneeOption = {
   id: number;
@@ -47,16 +51,20 @@ export function isAssigned(row: ContactRow): boolean {
   return !!row.assignments[0]?.users;
 }
 
+export function contactName(contact: ContactRow): string {
+  return (
+    [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—"
+  );
+}
+
 type BuildColumnsOptions = {
   viewer: Extract<Role, "admin" | "editor">;
-  onAssign: (contact: ContactRow) => void;
-  adminHandlers?: AdminRowHandlers;
+  handlers: ContactActionHandlers;
 };
 
 export function buildContactColumns({
   viewer,
-  onAssign,
-  adminHandlers,
+  handlers,
 }: BuildColumnsOptions): ColumnDef<ContactRow>[] {
   const select: ColumnDef<ContactRow> = {
     id: "select",
@@ -67,17 +75,18 @@ export function buildContactColumns({
           (table.getIsSomePageRowsSelected() && "indeterminate")
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Izaberi sve na stranici"
+        aria-label="Select all"
       />
     ),
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
         onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Izaberi red"
+        aria-label="Select row"
       />
     ),
     enableSorting: false,
+    enableHiding: false,
   };
 
   const company: ColumnDef<ContactRow> = {
@@ -107,15 +116,15 @@ export function buildContactColumns({
 
   const actions: ColumnDef<ContactRow> = {
     id: "actions",
-    header: () => <span className="sr-only">Akcije</span>,
     cell: ({ row }) => (
-      <ContactRowActions
+      <ContactActions
         contact={row.original}
-        onAssign={onAssign}
-        adminHandlers={adminHandlers}
+        viewer={viewer}
+        handlers={handlers}
       />
     ),
     enableSorting: false,
+    enableHiding: false,
   };
 
   if (viewer === "editor") {
@@ -131,7 +140,16 @@ export function buildContactColumns({
       header: ({ column }) => (
         <SortableColumnHeader column={column} title="Ime i Prezime" />
       ),
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row, cell }) => {
+        return (
+          <div className="flex items-center gap-2">
+            {dashValue(cell.getValue<string>())}
+            {row.original.notes && (
+              <NotebookTextIcon className="size-4 text-muted-foreground" />
+            )}
+          </div>
+        );
+      },
     },
     company,
     jobTitle,
@@ -150,9 +168,15 @@ export function buildContactColumns({
       cell: ({ getValue }) => dashValue(getValue()),
     },
     {
+      id: "mobile_phone",
+      header: "Mobilni Telefon",
+      accessorFn: (row) => formatPhoneNumber(row.mobile_phone),
+      cell: ({ getValue }) => dashValue(getValue()),
+    },
+    {
       id: "phone",
-      accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone),
-      header: "Telefon",
+      header: "Fiksni Telefon",
+      accessorFn: (row) => formatPhoneNumber(row.phone),
       cell: ({ getValue }) => dashValue(getValue()),
     },
     {
@@ -165,13 +189,39 @@ export function buildContactColumns({
       cell: ({ getValue }) => dashValue(getValue()),
     },
     {
-      id: "status",
+      id: "contact_status",
       accessorFn: (row) =>
-        row.contact_status?.[0]?.communication_status ?? null,
+        row.contact_status?.[0]?.communication_status ?? "Nepoznat",
       header: "Status",
-      cell: ({ getValue }) => dashValue(getValue()),
     },
     assignee,
     actions,
   ];
+}
+
+export function columnIdToLabel(columnId: string) {
+  switch (columnId) {
+    case "name":
+      return "Ime i Prezime";
+    case "company":
+      return "Firma";
+    case "job_title":
+      return "Pozicija";
+    case "city":
+      return "Grad";
+    case "email":
+      return "Email";
+    case "mobile_phone":
+      return "Mobilni Telefon";
+    case "phone":
+      return "Fiksni Telefon";
+    case "created_at":
+      return "Dodat";
+    case "contact_status":
+      return "Status";
+    case "assignee":
+      return "Dodeljen";
+    default:
+      return columnId;
+  }
 }
