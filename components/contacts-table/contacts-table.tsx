@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
+import { ChevronsLeftIcon, ChevronsRightIcon, SearchIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../ui/button";
@@ -74,6 +74,7 @@ export function ContactsTable({
   const page = searchParams.get("page")
     ? parseInt(searchParams.get("page")!)
     : 1;
+  const searchQuery = searchParams.get("q") ?? "";
   const urlSortingState = useMemo(() => {
     const sort = searchParams.get("sort");
     return sort
@@ -88,6 +89,7 @@ export function ContactsTable({
   const [sortingState, setSortingState] =
     useState<SortingState>(urlSortingState);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [searchValue, setSearchValue] = useState(searchQuery);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -99,6 +101,10 @@ export function ContactsTable({
   useEffect(() => {
     setSortingState(urlSortingState);
   }, [urlSortingState]);
+
+  useEffect(() => {
+    setSearchValue(searchQuery);
+  }, [searchQuery]);
 
   const handlePaginationChange = (updater: Updater<PaginationState>) => {
     const newState =
@@ -137,6 +143,21 @@ export function ContactsTable({
     router.push(`?${params.toString()}`);
   };
 
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const params = new URLSearchParams(searchParams);
+
+    if (searchValue.trim()) {
+      params.set("q", searchValue.trim());
+    } else {
+      params.delete("q");
+    }
+
+    params.delete("page");
+    router.push(`?${params.toString()}`);
+  };
+
   const table = useReactTable({
     data,
     columns,
@@ -163,10 +184,20 @@ export function ContactsTable({
   return (
     <div className="space-y-1 overflow-hidden">
       <div className="flex items-center py-4">
-        <Input
-          placeholder="Filtriraj kontakte..."
-          className="max-w-sm"
-        />
+        <form
+          onSubmit={handleSearchSubmit}
+          action=""
+          className="flex w-full max-w-sm gap-2"
+        >
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Filtriraj kontakte..."
+          />
+          <Button type="submit" variant="outline" size="icon">
+            <SearchIcon />
+          </Button>
+        </form>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

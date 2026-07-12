@@ -1,12 +1,13 @@
 import { ContactsTable } from "@/components/contacts-table/contacts-table";
+import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: number; sort?: string }>;
+  searchParams: Promise<{ page?: number; sort?: string; q?: string }>;
 }) {
-  const { page, sort } = await searchParams;
+  const { page, sort, q } = await searchParams;
 
   const supabase = createClient();
 
@@ -15,6 +16,13 @@ export default async function ContactsPage({
     .select(
       "*, contact_status(communication_status, interest_tag, updated_at)",
     );
+
+  const searchTerm = q?.trim();
+  const searchFilter = createSearchFilter(searchTerm);
+
+  if (searchFilter) {
+    applyFilter(query, searchFilter);
+  }
 
   if (sort) {
     const id = sort.split(":")[0];
@@ -46,9 +54,16 @@ export default async function ContactsPage({
 
   const { data: contacts, error } = await query;
 
-  const { count } = await supabase
-    .from("contacts")
-    .select("id", { count: "exact", head: true });
+  const countQuery = supabase.from("contacts").select("id", {
+    count: "exact",
+    head: true,
+  });
+
+  if (searchFilter) {
+    applyFilter(countQuery, searchFilter);
+  }
+
+  const { count } = await countQuery;
 
   const pagesCount = Math.ceil((count ?? 0) / 25);
 
