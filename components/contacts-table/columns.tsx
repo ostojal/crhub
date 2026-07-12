@@ -78,12 +78,19 @@ export const columns: ColumnDef<Contact>[] = [
     ),
   },
   {
+    id: "email",
     accessorKey: "email",
     header: "Email",
   },
   {
-    accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone!),
-    header: "Telefon",
+    id: "mobile_phone",
+    header: "Mobilni Telefon",
+    accessorFn: (row) => formatPhoneNumber(row.mobile_phone),
+  },
+  {
+    id: "phone",
+    header: "Fiksni Telefon",
+    accessorFn: (row) => formatPhoneNumber(row.phone),
   },
   {
     id: "created_at",
@@ -94,6 +101,7 @@ export const columns: ColumnDef<Contact>[] = [
     ),
   },
   {
+    id: "contact_status",
     accessorFn: (row) =>
       row.contact_status[0]?.communication_status ?? "Nepoznat",
     header: "Status",
@@ -137,8 +145,10 @@ export function columnIdToLabel(columnId: string) {
       return "Grad";
     case "email":
       return "Email";
+    case "mobile_phone":
+      return "Mobilni Telefon";
     case "phone":
-      return "Telefon";
+      return "Fiksni Telefon";
     case "created_at":
       return "Dodat";
     case "contact_status":

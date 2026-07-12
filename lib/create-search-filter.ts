@@ -58,6 +58,7 @@ function toPostgrestExpression(filter: ColumnFilter | SearchFilter): string {
   return `${filter.type}(${filter.filters.map(toPostgrestExpression).join(",")})`;
 }
 
+// todo: keep the docs up-to-date
 /**
  * Parse the free-text search syntax used by the contacts page.
  *
@@ -196,6 +197,7 @@ export function createSearchFilter(
                   },
                 ],
               };
+
             case "status":
               return {
                 kind: "binary",
@@ -240,6 +242,36 @@ export function createSearchFilter(
                     operator: "is-null",
                   },
                 ],
+              };
+
+            case "imafiksni":
+            case "fiksni":
+              return {
+                kind: "unary",
+                column: "phone",
+                operator: "is-not-null",
+              };
+
+            case "nemafiksni":
+              return {
+                kind: "unary",
+                column: "phone",
+                operator: "is-null",
+              };
+
+            case "imamobilni":
+            case "mobilni":
+              return {
+                kind: "unary",
+                column: "mobile_phone",
+                operator: "is-not-null",
+              };
+
+            case "nemamobilni":
+              return {
+                kind: "unary",
+                column: "mobile_phone",
+                operator: "is-null",
               };
 
             case "imaemail":
