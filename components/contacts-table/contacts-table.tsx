@@ -39,6 +39,7 @@ import {
   PaginationPrevious,
 } from "../ui/pagination";
 import { columnIdToLabel, columns } from "./columns";
+import { ContactBulkActions } from "./contact-bulk-actions";
 
 export type Contact = {
   id: string;
@@ -196,57 +197,65 @@ export function ContactsTable({
 
   return (
     <div className="space-y-1 overflow-hidden">
-      <div className="space-y-1 py-4">
-        <div className="flex items-center">
-          <form
-            onSubmit={handleSearchSubmit}
-            action=""
-            className="flex w-full max-w-sm gap-2"
-          >
-            <Input
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              placeholder="Filtriraj kontakte..."
-            />
-            <Button type="submit" variant="outline" size="icon">
-              <SearchIcon />
+      <div className="flex items-center">
+        <form
+          onSubmit={handleSearchSubmit}
+          action=""
+          className="flex w-full max-w-sm gap-2"
+        >
+          <Input
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Filtriraj kontakte..."
+          />
+          <Button type="submit" variant="outline" size="icon">
+            <SearchIcon />
+          </Button>
+        </form>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns
             </Button>
-          </form>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-max">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                    className="min-w-max"
+                  >
+                    {columnIdToLabel(column.id)}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
-                Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-max">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                      className="min-w-max"
-                    >
-                      {columnIdToLabel(column.id)}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
+      <div className="mt-2 flex items-end justify-between min-h-8">
         <p className="text-end text-sm text-muted-foreground">
           Prikazano {table.getRowModel().rows.length} od {contactsCount} redova
           {table.getFilteredSelectedRowModel().rows.length > 0 &&
             ` (izabrano ${table.getFilteredSelectedRowModel().rows.length})`}
           .
         </p>
+
+        {table.getFilteredSelectedRowModel().rows.length > 0 && (
+          <ContactBulkActions
+            contacts={table
+              .getFilteredSelectedRowModel()
+              .rows.map((x) => x.original)}
+          />
+        )}
       </div>
 
       <Table className="rounded-md border">
