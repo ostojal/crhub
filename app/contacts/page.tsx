@@ -1,4 +1,5 @@
 import { ContactsTable } from "@/components/contacts-table/contacts-table";
+import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ContactsPage({
@@ -6,6 +7,8 @@ export default async function ContactsPage({
 }: {
   searchParams: Promise<{ page?: number; sort?: string }>;
 }) {
+  await requireRole("admin");
+
   const { page, sort } = await searchParams;
 
   const supabase = createClient();

@@ -1,5 +1,10 @@
 import { auth, signOut } from "@/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ROLE_LABELS } from "@/lib/constants";
+import { getCurrentUser } from "@/lib/dal";
+import { NAV_LINKS } from "@/lib/nav";
+import { LogOutIcon } from "lucide-react";
+import Link from "next/link";
 import { FdLogo } from "./fd-logo";
 import { Button } from "./ui/button";
 import {
@@ -9,13 +14,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { LogOutIcon, SettingsIcon, User2Icon } from "lucide-react";
-import Link from "next/link";
 
 export default async function Navbar() {
   const session = await auth();
 
   if (!session?.user) return null;
+
+  const user = await getCurrentUser();
+  const links = user ? NAV_LINKS[user.role] : [];
 
   const { name, email, image } = session.user;
   const initial = (name ?? email ?? "?").charAt(0).toUpperCase();
@@ -23,13 +29,25 @@ export default async function Navbar() {
   return (
     <header className="sticky top-0 z-10 border-b border-foreground/10 bg-background/80 py-2 backdrop-blur">
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center justify-center gap-4">
-          <div className="grid size-10 place-items-center">
-            <FdLogo width={64} height={64} />
-          </div>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center justify-center gap-4">
+            <div className="grid size-10 place-items-center">
+              <FdLogo width={64} height={64} />
+            </div>
 
-          <p className="font-heading font-semibold">CRHub</p>
-        </Link>
+            <p className="font-heading font-semibold">CRHub</p>
+          </Link>
+
+          {links.length > 0 && (
+            <div className="hidden items-center gap-1 sm:flex">
+              {links.map((link) => (
+                <Button key={link.href} variant="ghost" size="sm" asChild>
+                  <Link href={link.href}>{link.label}</Link>
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           <DropdownMenu>
@@ -56,31 +74,28 @@ export default async function Navbar() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent className="w-min">
-              <DropdownMenuItem asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  asChild
-                >
-                  <Link href="/profile" className="w-full">
-                    <User2Icon />
-                    <span>Profil</span>
-                  </Link>
-                </Button>
-              </DropdownMenuItem>
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                {user ? ROLE_LABELS[user.role] : "Bez pristupa"}
+              </div>
 
-              <DropdownMenuItem asChild>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  asChild
-                >
-                  <Link href="/settings" className="w-full">
-                    <SettingsIcon />
-                    <span>Podešavanja</span>
-                  </Link>
-                </Button>
-              </DropdownMenuItem>
+              {links.length > 0 && (
+                <div className="sm:hidden">
+                  <DropdownMenuSeparator />
+                  {links.map((link) => (
+                    <DropdownMenuItem key={link.href} asChild>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                      >
+                        <Link href={link.href} className="w-full">
+                          <span>{link.label}</span>
+                        </Link>
+                      </Button>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              )}
 
               <DropdownMenuItem asChild>
                 <ThemeToggle />
