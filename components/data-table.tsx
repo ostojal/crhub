@@ -7,6 +7,7 @@ import {
   flexRender,
   getCoreRowModel,
   PaginationState,
+  Row,
   RowSelectionState,
   SortingState,
   Table as TanstackTable,
@@ -29,6 +30,7 @@ import {
   ChevronsUpDown,
   ChevronUp,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -52,6 +54,8 @@ type DataTableProps<TData> = {
   enableRowSelection?: boolean;
   // Renderuje se iznad tabele (npr. dugme za dodelu izabranih redova)
   toolbar?: (table: TanstackTable<TData>) => React.ReactNode;
+  // Kad je zadato, na mobilnom se umesto tabele prikazuje lista kartica
+  renderMobileCard?: (row: Row<TData>) => React.ReactNode;
 };
 
 // Prazna vrednost u ćeliji — koristi se u definicijama kolona umesto ranijeg
@@ -71,6 +75,7 @@ export function DataTable<TData>({
   getRowId,
   enableRowSelection = false,
   toolbar,
+  renderMobileCard,
 }: DataTableProps<TData>) {
   const router = useRouter();
 
@@ -173,7 +178,26 @@ export function DataTable<TData>({
     <div>
       {toolbar?.(table)}
 
-      <div className="overflow-hidden rounded-md border">
+      {renderMobileCard && (
+        <div className="space-y-3 md:hidden">
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <div key={row.id}>{renderMobileCard(row)}</div>
+            ))
+          ) : (
+            <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+              Nema rezultata.
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        className={cn(
+          "overflow-hidden rounded-md border",
+          renderMobileCard && "hidden md:block",
+        )}
+      >
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -222,8 +246,9 @@ export function DataTable<TData>({
             )}
           </TableBody>
         </Table>
+      </div>
 
-        <Pagination className="my-4">
+      <Pagination className="my-4">
           <PaginationContent>
             {table.getState().pagination.pageIndex >= 1 && (
               <PaginationItem>
@@ -287,7 +312,6 @@ export function DataTable<TData>({
             )}
           </PaginationContent>
         </Pagination>
-      </div>
     </div>
   );
 }

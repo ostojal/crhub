@@ -1,12 +1,18 @@
 "use client";
 
+import { CopyButton } from "@/components/copy-button";
 import { DataTable } from "@/components/data-table";
 import {
   type LogContact,
   LogInteractionDialog,
 } from "@/components/interactions/log-interaction-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MobileCard, MobileField } from "@/components/ui/mobile-list";
+import { formatPhoneNumber } from "@/lib/format";
+import { format } from "date-fns";
 import { PhoneOutgoingIcon } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import type { Table as TanstackTable } from "@tanstack/react-table";
 import {
@@ -47,6 +53,74 @@ export function MyContactsView({
         defaultSort={{ id: "assigned_at", desc: true }}
         getRowId={(row) => String(row.id)}
         enableRowSelection
+        renderMobileCard={(row) => {
+          const contact = row.original;
+          const rawPhone = contact.phone ?? contact.mobile_phone;
+          const status = contact.contact_status?.[0]?.communication_status;
+          return (
+            <MobileCard className="space-y-2">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={row.getIsSelected()}
+                  onCheckedChange={(value) => row.toggleSelected(!!value)}
+                  aria-label="Izaberi kontakt"
+                  className="mt-1"
+                />
+                <Link
+                  href={`/contacts/${contact.id}`}
+                  className="font-medium underline-offset-4 hover:underline"
+                >
+                  {contactDisplayName(contact)}
+                </Link>
+              </div>
+
+              <div className="border-t pt-2">
+                {contact.company && (
+                  <MobileField label="Firma">{contact.company}</MobileField>
+                )}
+                {contact.job_title && (
+                  <MobileField label="Pozicija">
+                    {contact.job_title}
+                  </MobileField>
+                )}
+                {rawPhone && (
+                  <MobileField label="Telefon">
+                    <span className="inline-flex items-center gap-1">
+                      {formatPhoneNumber(rawPhone)}
+                      <CopyButton value={rawPhone} label="Telefon" />
+                    </span>
+                  </MobileField>
+                )}
+                {contact.email && (
+                  <MobileField label="Email">
+                    <span className="inline-flex items-center gap-1">
+                      {contact.email}
+                      <CopyButton value={contact.email} label="Email" />
+                    </span>
+                  </MobileField>
+                )}
+                {status && <MobileField label="Status">{status}</MobileField>}
+                <MobileField label="Dodeljen">
+                  {format(contact.assigned_at, "dd.MM.yyyy.")}
+                </MobileField>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() =>
+                  setLogTargets([
+                    { id: contact.id, name: contactDisplayName(contact) },
+                  ])
+                }
+              >
+                <PhoneOutgoingIcon data-icon="inline-start" />
+                Evidentiraj
+              </Button>
+            </MobileCard>
+          );
+        }}
         toolbar={(table) => {
           tableRef.current = table;
           const selected = table.getSelectedRowModel().rows;

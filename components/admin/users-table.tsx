@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { MobileCard } from "@/components/ui/mobile-list";
 import {
   Select,
   SelectContent,
@@ -73,8 +74,70 @@ export function UsersTable({
     });
   };
 
+  const roleSelect = (user: AdminUser, isSelf: boolean) => (
+    <Select
+      value={
+        user.role && isOneOf(user.role, ROLES) ? user.role : PENDING_VALUE
+      }
+      onValueChange={(value) => handleRoleChange(user.id, value)}
+      disabled={isSelf || isPending}
+    >
+      <SelectTrigger
+        className="w-40"
+        title={isSelf ? "Ne možeš menjati sopstvenu ulogu" : undefined}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={PENDING_VALUE}>{PENDING_ROLE_LABEL}</SelectItem>
+        {ROLES.map((role) => (
+          <SelectItem key={role} value={role}>
+            {ROLE_LABELS[role]}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
   return (
-    <div className="overflow-hidden rounded-md border">
+    <>
+      <div className="space-y-3 md:hidden">
+        {users.length ? (
+          users.map((user) => {
+            const isSelf = user.id === currentUserId;
+            return (
+              <MobileCard key={user.id} className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="font-medium">{user.full_name || "—"}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {user.email || "—"}
+                    </span>
+                  </div>
+                  {!isSelf && (
+                    <DeleteUserButton
+                      userId={user.id}
+                      email={user.email || "—"}
+                    />
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t pt-2">
+                  {roleSelect(user, isSelf)}
+                  <span className="text-sm text-muted-foreground">
+                    {format(user.created_at, "dd.MM.yyyy.")}
+                  </span>
+                </div>
+              </MobileCard>
+            );
+          })
+        ) : (
+          <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
+            Nema korisnika.
+          </div>
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-md border md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -102,38 +165,7 @@ export function UsersTable({
                     </div>
                   </TableCell>
                   <TableCell className="px-4">
-                    <Select
-                      value={
-                        user.role && isOneOf(user.role, ROLES)
-                          ? user.role
-                          : PENDING_VALUE
-                      }
-                      onValueChange={(value) =>
-                        handleRoleChange(user.id, value)
-                      }
-                      disabled={isSelf || isPending}
-                    >
-                      <SelectTrigger
-                        className="w-40"
-                        title={
-                          isSelf
-                            ? "Ne možeš menjati sopstvenu ulogu"
-                            : undefined
-                        }
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={PENDING_VALUE}>
-                          {PENDING_ROLE_LABEL}
-                        </SelectItem>
-                        {ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {roleSelect(user, isSelf)}
                   </TableCell>
                   <TableCell className="px-4">
                     {format(user.created_at, "dd.MM.yyyy.")}
@@ -158,7 +190,8 @@ export function UsersTable({
           )}
         </TableBody>
       </Table>
-    </div>
+      </div>
+    </>
   );
 }
 

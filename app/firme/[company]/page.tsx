@@ -1,5 +1,6 @@
 import { CopyButton } from "@/components/copy-button";
 import { Badge } from "@/components/ui/badge";
+import { MobileCard, MobileField } from "@/components/ui/mobile-list";
 import {
   Table,
   TableBody,
@@ -106,7 +107,80 @@ export default async function CompanyPage({
         {contacts.length}
       </p>
 
-      <div className="overflow-hidden rounded-md border">
+      <div className="space-y-3 md:hidden">
+        {contacts.map((contact) => {
+          const name =
+            [contact.first_name, contact.last_name]
+              .filter(Boolean)
+              .join(" ") || "—";
+          const phoneRaw = contact.phone ?? contact.mobile_phone;
+          const status = contact.contact_status[0] ?? null;
+          const interactionsCount = contact.interactions[0]?.count ?? 0;
+          const assigneeName = contact.assignments[0]?.users?.full_name ?? null;
+
+          return (
+            <MobileCard key={contact.id} className="space-y-2">
+              <Link
+                href={`/contacts/${contact.id}`}
+                className="font-medium underline-offset-4 hover:underline"
+              >
+                {name}
+              </Link>
+              <div className="space-y-0.5 border-t pt-2">
+                {contact.job_title && (
+                  <MobileField label="Pozicija">
+                    {contact.job_title}
+                  </MobileField>
+                )}
+                {contact.city && (
+                  <MobileField label="Grad">{contact.city}</MobileField>
+                )}
+                {phoneRaw && (
+                  <MobileField label="Telefon">
+                    <span className="inline-flex items-center gap-1">
+                      {formatPhoneNumber(phoneRaw)}
+                      <CopyButton value={phoneRaw} label="Telefon" />
+                    </span>
+                  </MobileField>
+                )}
+                {contact.email && (
+                  <MobileField label="Email">
+                    <span className="inline-flex items-center gap-1">
+                      {contact.email}
+                      <CopyButton value={contact.email} label="Email" />
+                    </span>
+                  </MobileField>
+                )}
+                <MobileField label="Status">
+                  <span className="inline-flex flex-wrap justify-end gap-1">
+                    <Badge variant="secondary">
+                      {status?.communication_status ?? "Nije kontaktiran"}
+                    </Badge>
+                    {status?.interest_tag && (
+                      <Badge variant="outline">{status.interest_tag}</Badge>
+                    )}
+                  </span>
+                </MobileField>
+                <MobileField label="Kontaktiran">
+                  {interactionsCount > 0 ? (
+                    <span className="inline-flex items-center gap-1">
+                      <CheckIcon className="size-4 text-primary" />
+                      Da ({interactionsCount})
+                    </span>
+                  ) : (
+                    "Ne"
+                  )}
+                </MobileField>
+                {assigneeName && (
+                  <MobileField label="Dodeljen">{assigneeName}</MobileField>
+                )}
+              </div>
+            </MobileCard>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-md border md:block">
         <Table>
           <TableHeader>
             <TableRow>
