@@ -6,27 +6,42 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+// Ogledalo stvarne šeme (provereno kroz PostgREST OpenAPI):
+// - svi id-jevi su bigint (number), ne uuid
+// - communication_status i interest_tag su Postgres enumi
+// - tekstualne kolone imaju default '' i nullable su, pa "prazno" može
+//   biti i '' i null
+export type CommunicationStatus =
+  | "Nije kontaktiran"
+  | "Poslato"
+  | "Dobijen odgovor"
+  | "Na čekanju"
+  | "Prihvaćeno"
+  | "Odbijeno";
+
+export type InterestTag = "Bili zainteresovani" | "Za sledeći projekat";
+
 export interface Database {
   public: {
     Tables: {
       users: {
         Row: {
-          id: string;
-          email: string;
+          id: number;
+          email: string | null;
           full_name: string | null;
           role: string | null;
           created_at: string;
         };
         Insert: {
-          id?: string;
-          email: string;
+          id?: number;
+          email?: string | null;
           full_name?: string | null;
           role?: string | null;
           created_at?: string;
         };
         Update: {
-          id?: string;
-          email?: string;
+          id?: number;
+          email?: string | null;
           full_name?: string | null;
           role?: string | null;
           created_at?: string;
@@ -35,10 +50,10 @@ export interface Database {
       };
       contacts: {
         Row: {
-          id: string;
+          id: number;
           company: string | null;
-          first_name: string;
-          last_name: string;
+          first_name: string | null;
+          last_name: string | null;
           job_title: string | null;
           email: string | null;
           phone: string | null;
@@ -48,10 +63,10 @@ export interface Database {
           created_at: string;
         };
         Insert: {
-          id?: string;
+          id?: number;
           company?: string | null;
-          first_name: string;
-          last_name: string;
+          first_name?: string | null;
+          last_name?: string | null;
           job_title?: string | null;
           email?: string | null;
           phone?: string | null;
@@ -61,10 +76,10 @@ export interface Database {
           created_at?: string;
         };
         Update: {
-          id?: string;
+          id?: number;
           company?: string | null;
-          first_name?: string;
-          last_name?: string;
+          first_name?: string | null;
+          last_name?: string | null;
           job_title?: string | null;
           email?: string | null;
           phone?: string | null;
@@ -77,23 +92,23 @@ export interface Database {
       };
       assignments: {
         Row: {
-          id: string;
-          contact_id: string;
-          user_id: string;
+          id: number;
+          contact_id: number | null;
+          user_id: number | null;
           assigned_at: string;
           assigned_by: string | null;
         };
         Insert: {
-          id?: string;
-          contact_id: string;
-          user_id: string;
+          id?: number;
+          contact_id?: number | null;
+          user_id?: number | null;
           assigned_at?: string;
           assigned_by?: string | null;
         };
         Update: {
-          id?: string;
-          contact_id?: string;
-          user_id?: string;
+          id?: number;
+          contact_id?: number | null;
+          user_id?: number | null;
           assigned_at?: string;
           assigned_by?: string | null;
         };
@@ -116,26 +131,26 @@ export interface Database {
       };
       interactions: {
         Row: {
-          id: string;
-          contact_id: string;
-          user_id: string;
-          type: string;
+          id: number;
+          contact_id: number | null;
+          user_id: number | null;
+          type: string | null;
           notes: string | null;
           created_at: string;
         };
         Insert: {
-          id?: string;
-          contact_id: string;
-          user_id: string;
-          type: string;
+          id?: number;
+          contact_id?: number | null;
+          user_id?: number | null;
+          type?: string | null;
           notes?: string | null;
           created_at?: string;
         };
         Update: {
-          id?: string;
-          contact_id?: string;
-          user_id?: string;
-          type?: string;
+          id?: number;
+          contact_id?: number | null;
+          user_id?: number | null;
+          type?: string | null;
           notes?: string | null;
           created_at?: string;
         };
@@ -158,26 +173,26 @@ export interface Database {
       };
       contact_status: {
         Row: {
-          id: string;
-          contact_id: string;
-          communication_status: string | null;
-          interest_tag: string | null;
+          id: number;
+          contact_id: number | null;
+          communication_status: CommunicationStatus | null;
+          interest_tag: InterestTag | null;
           updated_at: string;
           updated_by: string | null;
         };
         Insert: {
-          id?: string;
-          contact_id: string;
-          communication_status?: string | null;
-          interest_tag?: string | null;
+          id?: number;
+          contact_id?: number | null;
+          communication_status?: CommunicationStatus | null;
+          interest_tag?: InterestTag | null;
           updated_at?: string;
           updated_by?: string | null;
         };
         Update: {
-          id?: string;
-          contact_id?: string;
-          communication_status?: string | null;
-          interest_tag?: string | null;
+          id?: number;
+          contact_id?: number | null;
+          communication_status?: CommunicationStatus | null;
+          interest_tag?: InterestTag | null;
           updated_at?: string;
           updated_by?: string | null;
         };
@@ -194,7 +209,10 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
-    Enums: Record<string, never>;
+    Enums: {
+      status: CommunicationStatus;
+      tag: InterestTag;
+    };
     CompositeTypes: Record<string, never>;
   };
 }

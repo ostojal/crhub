@@ -8,7 +8,8 @@ import { format } from "date-fns";
 export const columns: ColumnDef<Contact>[] = [
   {
     id: "name",
-    accessorFn: (row) => `${row.first_name} ${row.last_name}`,
+    accessorFn: (row) =>
+      [row.first_name, row.last_name].filter(Boolean).join(" "),
 
     header: ({ column }) => (
       <SortableColumnHeader column={column} title="Ime i Prezime" />
@@ -43,7 +44,7 @@ export const columns: ColumnDef<Contact>[] = [
     header: "Email",
   },
   {
-    accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone!),
+    accessorFn: (row) => formatPhoneNumber(row.phone ?? row.mobile_phone),
     header: "Telefon",
   },
   {

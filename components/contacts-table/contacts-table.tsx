@@ -32,10 +32,10 @@ import {
 import { columns } from "./columns";
 
 export type Contact = {
-  id: string;
+  id: number;
   company: string | null;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   job_title: string | null;
   email: string | null;
   phone: string | null;
