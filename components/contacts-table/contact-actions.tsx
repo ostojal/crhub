@@ -43,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { contactName, type ContactRow, isAssigned } from "./columns";
+import { NotesDialog } from "./notes-dialog";
 
 export type ContactActionHandlers = {
   onAssign: (contact: ContactRow) => void;
@@ -144,28 +145,16 @@ export function ContactActions({
             )}
 
             {contact.notes && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <NotebookIcon />
-                    Prikaži Note
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Note — {contactName(contact)}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="whitespace-pre-wrap">
-                      {contact.notes}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Zatvori</AlertDialogCancel>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <NotesDialog contact={contact}>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                  }}
+                >
+                  <NotebookIcon />
+                  Prikaži Note
+                </DropdownMenuItem>
+              </NotesDialog>
             )}
 
             <DropdownMenuSeparator />
@@ -180,10 +169,16 @@ export function ContactActions({
               Promeni Status
             </DropdownMenuItem>
 
-            <DropdownMenuItem onSelect={() => handlers.onEdit(contact)}>
-              <NotebookPenIcon />
-              Promeni Note
-            </DropdownMenuItem>
+            <NotesDialog contact={contact} defaultEditing>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                <NotebookPenIcon />
+                Promeni Note
+              </DropdownMenuItem>
+            </NotesDialog>
           </>
         )}
 
