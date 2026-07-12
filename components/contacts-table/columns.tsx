@@ -85,3 +85,26 @@ function SortableColumnHeader({
     </Button>
   );
 }
+
+export function columnIdToLabel(columnId: string) {
+  switch (columnId) {
+    case "name":
+      return "Ime i Prezime";
+    case "company":
+      return "Firma";
+    case "job_title":
+      return "Pozicija";
+    case "city":
+      return "Grad";
+    case "email":
+      return "Email";
+    case "phone":
+      return "Telefon";
+    case "created_at":
+      return "Dodat";
+    case "contact_status":
+      return "Status";
+    default:
+      return columnId;
+  }
+}

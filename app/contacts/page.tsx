@@ -63,7 +63,7 @@ export default async function ContactsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
       <ContactsTable contacts={contacts || []} pagesCount={pagesCount} />

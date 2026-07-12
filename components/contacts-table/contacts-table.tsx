@@ -8,6 +8,7 @@ import {
   SortingState,
   Updater,
   useReactTable,
+  VisibilityState,
 } from "@tanstack/react-table";
 
 import {
@@ -21,6 +22,14 @@ import {
 import { ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "../ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Input } from "../ui/input";
 import {
   Pagination,
   PaginationContent,
@@ -29,7 +38,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "../ui/pagination";
-import { columns } from "./columns";
+import { columnIdToLabel, columns } from "./columns";
 
 export type Contact = {
   id: string;
@@ -78,6 +87,7 @@ export function ContactsTable({
   });
   const [sortingState, setSortingState] =
     useState<SortingState>(urlSortingState);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -141,15 +151,52 @@ export function ContactsTable({
     manualSorting: true,
     enableSorting: true,
 
+    onColumnVisibilityChange: setColumnVisibility,
+
     state: {
       pagination: paginationState,
       sorting: sortingState,
+      columnVisibility,
     },
   });
 
   return (
-    <div className="overflow-hidden rounded-md border">
-      <Table>
+    <div className="space-y-1 overflow-hidden">
+      <div className="flex items-center py-4">
+        <Input
+          placeholder="Filtriraj kontakte..."
+          className="max-w-sm"
+        />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-max">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                    className="min-w-max"
+                  >
+                    {columnIdToLabel(column.id)}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <Table className="rounded-md border">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
