@@ -6,6 +6,7 @@ import {
   type LogContact,
   LogInteractionDialog,
 } from "@/components/interactions/log-interaction-dialog";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MobileCard, MobileField } from "@/components/ui/mobile-list";
@@ -99,8 +100,10 @@ export function MyContactsView({
                     </span>
                   </MobileField>
                 )}
-                {status && <MobileField label="Status">{status}</MobileField>}
-                <MobileField label="Dodeljen">
+                <MobileField label="Status">
+                  <StatusBadge status={status} />
+                </MobileField>
+                <MobileField label="Dodeljeno">
                   {format(contact.assigned_at, "dd.MM.yyyy.")}
                 </MobileField>
               </div>

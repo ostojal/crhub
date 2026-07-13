@@ -42,11 +42,11 @@ const FIELDS: {
 }[] = [
   { name: "first_name", label: "Ime", required: true },
   { name: "last_name", label: "Prezime", required: true },
-  { name: "company", label: "Firma" },
+  { name: "company", label: "Kompanija" },
   { name: "job_title", label: "Pozicija" },
   { name: "email", label: "Email", type: "email" },
   { name: "phone", label: "Telefon" },
-  { name: "mobile_phone", label: "Mobilni" },
+  { name: "mobile_phone", label: "Mobilni telefon" },
   { name: "city", label: "Grad" },
 ];
 

@@ -1,5 +1,6 @@
 import { CopyButton } from "@/components/copy-button";
 import { dashValue } from "@/components/data-table";
+import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatPhoneNumber } from "@/lib/format";
@@ -65,7 +66,7 @@ export function buildMyContactColumns({
     {
       id: "name",
       accessorFn: (row) => contactDisplayName(row),
-      header: "Ime i Prezime",
+      header: "Ime i prezime",
       cell: ({ row }) => (
         <Link
           href={`/contacts/${row.original.id}`}
@@ -78,7 +79,7 @@ export function buildMyContactColumns({
     {
       id: "company",
       accessorKey: "company",
-      header: "Firma",
+      header: "Kompanija",
       cell: ({ getValue }) => dashValue(getValue()),
     },
     {
@@ -119,12 +120,16 @@ export function buildMyContactColumns({
       accessorFn: (row) =>
         row.contact_status?.[0]?.communication_status ?? null,
       header: "Status",
-      cell: ({ getValue }) => dashValue(getValue()),
+      cell: ({ row }) => (
+        <StatusBadge
+          status={row.original.contact_status?.[0]?.communication_status}
+        />
+      ),
     },
     {
       id: "assigned_at",
       accessorFn: (row) => format(row.assigned_at, "dd.MM.yyyy."),
-      header: "Dodeljen",
+      header: "Dodeljeno",
     },
     {
       id: "actions",

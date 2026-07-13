@@ -139,7 +139,7 @@ export async function assignCompany(
 
   const company = cleanText(rawCompany, 300);
   if (!company || !isId(userId)) {
-    return { ok: false, error: "Neispravna firma ili korisnik." };
+    return { ok: false, error: "Neispravna kompanija ili korisnik." };
   }
 
   const supabase = createClient();
@@ -156,7 +156,7 @@ export async function assignCompany(
 
   if (contactsError) return { ok: false, error: "Greška pri dodeli." };
   if (!contacts?.length) {
-    return { ok: false, error: "Firma nema nijedan kontakt." };
+    return { ok: false, error: "Kompanija nema nijedan kontakt." };
   }
 
   const contactIds = contacts.map((c) => c.id);
@@ -245,7 +245,7 @@ export async function getCompanyAssignmentInfo(
   if (!me) return { ok: false, error: NO_PERMISSION };
 
   const company = cleanText(rawCompany, 300);
-  if (!company) return { ok: false, error: "Neispravna firma." };
+  if (!company) return { ok: false, error: "Neispravna kompanija." };
 
   const supabase = createClient();
 

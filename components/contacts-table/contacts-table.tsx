@@ -21,6 +21,7 @@ import {
   LogInteractionDialog,
 } from "@/components/interactions/log-interaction-dialog";
 import { CopyButton } from "@/components/copy-button";
+import { StatusBadge } from "@/components/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MobileCard, MobileField } from "@/components/ui/mobile-list";
 import {
@@ -142,7 +143,7 @@ function ContactMobileCard({
 
       <div className="border-t pt-2">
         {isAdmin && contact.company && (
-          <MobileField label="Firma">
+          <MobileField label="Kompanija">
             <Link
               href={`/firme/${encodeURIComponent(contact.company)}`}
               className="underline-offset-4 hover:underline"
@@ -182,14 +183,16 @@ function ContactMobileCard({
           </MobileField>
         )}
         {isAdmin && (
-          <MobileField label="Status">{status ?? "Nepoznat"}</MobileField>
+          <MobileField label="Status">
+            <StatusBadge status={status} />
+          </MobileField>
         )}
         {isAdmin && contact.created_at && (
           <MobileField label="Dodat">
             {format(contact.created_at, "dd.MM.yyyy.")}
           </MobileField>
         )}
-        <MobileField label="Dodeljen">{assignee ?? "—"}</MobileField>
+        <MobileField label="Dodeljeno">{assignee ?? "—"}</MobileField>
       </div>
     </MobileCard>
   );
@@ -390,7 +393,7 @@ export function ContactsTable({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="ml-auto hidden md:inline-flex">
-              Columns
+              Kolone
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-max">

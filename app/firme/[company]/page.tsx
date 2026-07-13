@@ -1,4 +1,5 @@
 import { CopyButton } from "@/components/copy-button";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { MobileCard, MobileField } from "@/components/ui/mobile-list";
 import {
@@ -153,9 +154,7 @@ export default async function CompanyPage({
                 )}
                 <MobileField label="Status">
                   <span className="inline-flex flex-wrap justify-end gap-1">
-                    <Badge variant="secondary">
-                      {status?.communication_status ?? "Nije kontaktiran"}
-                    </Badge>
+                    <StatusBadge status={status?.communication_status} />
                     {status?.interest_tag && (
                       <Badge variant="outline">{status.interest_tag}</Badge>
                     )}
@@ -248,9 +247,7 @@ export default async function CompanyPage({
                   </TableCell>
                   <TableCell className="px-4">
                     <div className="flex flex-wrap gap-1">
-                      <Badge variant="secondary">
-                        {status?.communication_status ?? "Nije kontaktiran"}
-                      </Badge>
+                      <StatusBadge status={status?.communication_status} />
                       {status?.interest_tag && (
                         <Badge variant="outline">{status.interest_tag}</Badge>
                       )}

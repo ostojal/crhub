@@ -17,20 +17,22 @@ export default async function MyContactsPage({
 
   const supabase = createClient();
 
-  const { data: assignments, error } = await supabase
-    .from("assignments")
-    .select(
-      "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at))",
-    )
-    .eq("user_id", me.id)
-    .order("assigned_at", { ascending: false })
-    .order("id", { ascending: true })
-    .range(from, from + PAGE_SIZE - 1);
-
-  const { count } = await supabase
-    .from("assignments")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", me.id);
+  // Upit i prebrojavanje idu paralelno — jedno kruženje do baze umesto dva
+  const [{ data: assignments, error }, { count }] = await Promise.all([
+    supabase
+      .from("assignments")
+      .select(
+        "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at))",
+      )
+      .eq("user_id", me.id)
+      .order("assigned_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1),
+    supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", me.id),
+  ]);
 
   const pagesCount = Math.ceil((count ?? 0) / PAGE_SIZE);
 

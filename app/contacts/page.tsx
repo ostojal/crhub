@@ -90,14 +90,18 @@ export default async function ContactsPage({
 
   query.range(((page ?? 1) - 1) * PAGE_SIZE, (page ?? 1) * PAGE_SIZE - 1);
 
-  const { data: contacts, error } = await query;
-  const { count } = await countQuery;
-
-  const { data: assignees } = await supabase
+  // Tri nezavisna upita idu paralelno — jedno kruženje do baze umesto tri
+  const assigneesQuery = supabase
     .from("users")
     .select("id, full_name, email")
     .eq("role", "user")
     .order("full_name", { ascending: true });
+
+  const [
+    { data: contacts, error },
+    { count },
+    { data: assignees },
+  ] = await Promise.all([query, countQuery, assigneesQuery]);
 
   if (error) {
     return (

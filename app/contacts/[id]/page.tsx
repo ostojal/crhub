@@ -2,6 +2,7 @@ import { ContactAdminActions } from "@/components/contacts/contact-admin-actions
 import { CopyButton } from "@/components/copy-button";
 import { InteractionsList } from "@/components/interactions/interactions-list";
 import { LogInteractionButton } from "@/components/interactions/log-interaction-button";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -30,26 +31,28 @@ export default async function ContactDetailPage({
 
   const supabase = createClient();
 
-  const { data: contact } = await supabase
-    .from("contacts")
-    .select(
-      "*, contact_status(communication_status, interest_tag, updated_at), assignments(assigned_at, users(id, full_name, email))",
-    )
-    .eq("id", contactId)
-    .order("updated_at", {
-      referencedTable: "contact_status",
-      ascending: false,
-    })
-    .maybeSingle();
+  // Kontakt i istorija interakcija idu paralelno — oba znaju contactId
+  const [{ data: contact }, { data: interactions }] = await Promise.all([
+    supabase
+      .from("contacts")
+      .select(
+        "*, contact_status(communication_status, interest_tag, updated_at), assignments(assigned_at, users(id, full_name, email))",
+      )
+      .eq("id", contactId)
+      .order("updated_at", {
+        referencedTable: "contact_status",
+        ascending: false,
+      })
+      .maybeSingle(),
+    supabase
+      .from("interactions")
+      .select("id, type, notes, created_at, users(full_name, email)")
+      .eq("contact_id", contactId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
 
   if (!contact) notFound();
-
-  const { data: interactions } = await supabase
-    .from("interactions")
-    .select("id, type, notes, created_at, users(full_name, email)")
-    .eq("contact_id", contactId)
-    .order("created_at", { ascending: false })
-    .limit(100);
 
   const name =
     [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—";
@@ -63,7 +66,7 @@ export default async function ContactDetailPage({
 
   const fields: { label: string; value: React.ReactNode; copy?: string }[] = [
     {
-      label: "Firma",
+      label: "Kompanija",
       value:
         contact.company && me.role === "admin" ? (
           <Link
@@ -93,7 +96,7 @@ export default async function ContactDetailPage({
       label: "Dodat",
       value: format(contact.created_at, "dd.MM.yyyy."),
     },
-    { label: "Dodeljen", value: assigneeName },
+    { label: "Dodeljeno", value: assigneeName },
   ];
 
   return (
@@ -113,9 +116,7 @@ export default async function ContactDetailPage({
             {[contact.job_title, contact.company].filter(Boolean).join(" · ")}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Badge variant="secondary">
-              {status?.communication_status ?? "Nije kontaktiran"}
-            </Badge>
+            <StatusBadge status={status?.communication_status} />
             {status?.interest_tag && (
               <Badge variant="outline">{status.interest_tag}</Badge>
             )}

@@ -15,10 +15,14 @@ export type CurrentUser = {
   role: Role;
 };
 
+// auth() dekodira/verifikuje JWT iz cookie-ja; cache() ga dedupira u okviru
+// istog requesta (getCurrentUser i requireUser bi ga inače zvali odvojeno).
+export const getSession = cache(() => auth());
+
 // Uloga se čita iz baze pri svakom requestu (ne iz JWT-a), pa izmena ili
 // ukidanje uloge važi odmah. cache() dedupira pozive unutar istog requesta.
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
-  const session = await auth();
+  const session = await getSession();
   const email = session?.user?.email?.toLowerCase();
   if (!email) return null;
 
@@ -42,7 +46,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 });
 
 export async function requireUser(): Promise<CurrentUser> {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) redirect("/login");
 
   const user = await getCurrentUser();
