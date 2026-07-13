@@ -110,7 +110,7 @@ export function ContactActions({
 
             <DropdownMenuItem onSelect={() => handlers.onLog(contact)}>
               <PhoneOutgoingIcon />
-              Evidentiraj Kontaktiranje
+              Kontaktiraj
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
@@ -119,7 +119,7 @@ export function ContactActions({
               onClick={() => navigator.clipboard.writeText(String(contact.id))}
             >
               <CopyIcon />
-              Kopiraj Id
+              Kopiraj id
             </DropdownMenuItem>
 
             {contact.email && (
@@ -127,7 +127,7 @@ export function ContactActions({
                 onClick={() => navigator.clipboard.writeText(contact.email!)}
               >
                 <MailIcon />
-                Kopiraj Email
+                Kopiraj email
               </DropdownMenuItem>
             )}
 
@@ -138,7 +138,7 @@ export function ContactActions({
                 }
               >
                 <PhoneCallIcon />
-                Kopiraj Mobilni
+                Kopiraj mobilni telefon
               </DropdownMenuItem>
             )}
 
@@ -147,7 +147,7 @@ export function ContactActions({
                 onClick={() => navigator.clipboard.writeText(contact.phone!)}
               >
                 <VoicemailIcon />
-                Kopiraj Fiksni
+                Kopiraj fiksni telefon
               </DropdownMenuItem>
             )}
 
@@ -159,7 +159,7 @@ export function ContactActions({
                   }}
                 >
                   <NotebookIcon />
-                  Prikaži Note
+                  Prikaži note
                 </DropdownMenuItem>
               </NotesDialog>
             )}
@@ -168,12 +168,12 @@ export function ContactActions({
 
             <DropdownMenuItem onSelect={() => handlers.onEdit(contact)}>
               <EditIcon />
-              Promeni Info
+              Promeni info
             </DropdownMenuItem>
 
             <DropdownMenuItem onSelect={() => handlers.onEditStatus(contact)}>
               <InfoIcon />
-              Promeni Status
+              Promeni status
             </DropdownMenuItem>
 
             <NotesDialog contact={contact} defaultEditing>
@@ -183,7 +183,7 @@ export function ContactActions({
                 }}
               >
                 <NotebookPenIcon />
-                Promeni Note
+                Promeni note
               </DropdownMenuItem>
             </NotesDialog>
           </>
@@ -191,13 +191,13 @@ export function ContactActions({
 
         <DropdownMenuItem onSelect={() => handlers.onAssign(contact)}>
           <UserRoundPlusIcon />
-          Dodeli Pristup
+          Dodeli pristup
         </DropdownMenuItem>
 
         {isAssigned(contact) && (
           <DropdownMenuItem onSelect={handleUnassign}>
             <UserRoundMinus />
-            Ukloni Pristup
+            Ukloni pristup
           </DropdownMenuItem>
         )}
 

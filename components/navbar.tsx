@@ -1,7 +1,7 @@
-import { auth, signOut } from "@/auth";
+import { signOut } from "@/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ROLE_LABELS } from "@/lib/constants";
-import { getCurrentUser } from "@/lib/dal";
+import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
@@ -17,7 +17,7 @@ import {
 } from "./ui/dropdown-menu";
 
 export default async function Navbar() {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) return null;
 

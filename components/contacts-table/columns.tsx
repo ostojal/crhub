@@ -1,5 +1,6 @@
 import { CopyButton } from "@/components/copy-button";
 import { dashValue, SortableColumnHeader } from "@/components/data-table";
+import { StatusBadge } from "@/components/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Role } from "@/lib/constants";
 import { formatPhoneNumber } from "@/lib/format";
@@ -95,7 +96,7 @@ export function buildContactColumns({
     id: "company",
     accessorKey: "company",
     header: ({ column }) => (
-      <SortableColumnHeader column={column} title="Firma" />
+      <SortableColumnHeader column={column} title="Kompanija" />
     ),
     cell: ({ getValue }) => {
       const value = getValue<string | null>();
@@ -126,7 +127,7 @@ export function buildContactColumns({
   const assignee: ColumnDef<ContactRow> = {
     id: "assignee",
     accessorFn: (row) => getAssigneeName(row),
-    header: "Dodeljen",
+    header: "Dodeljeno",
     cell: ({ getValue }) => dashValue(getValue()),
   };
 
@@ -197,7 +198,7 @@ export function buildContactColumns({
     },
     {
       id: "mobile_phone",
-      header: "Mobilni Telefon",
+      header: "Mobilni telefon",
       accessorFn: (row) => formatPhoneNumber(row.mobile_phone),
       cell: ({ row, getValue }) => (
         <div className="flex items-center gap-1">
@@ -213,7 +214,7 @@ export function buildContactColumns({
     },
     {
       id: "phone",
-      header: "Fiksni Telefon",
+      header: "Fiksni telefon",
       accessorFn: (row) => formatPhoneNumber(row.phone),
       cell: ({ row, getValue }) => (
         <div className="flex items-center gap-1">
@@ -229,7 +230,7 @@ export function buildContactColumns({
       accessorFn: (row) =>
         row.created_at ? format(row.created_at, "dd.MM.yyyy.") : null,
       header: ({ column }) => (
-        <SortableColumnHeader column={column} title="Dodat" />
+        <SortableColumnHeader column={column} title="Dodato" />
       ),
       cell: ({ getValue }) => dashValue(getValue()),
     },
@@ -238,6 +239,11 @@ export function buildContactColumns({
       accessorFn: (row) =>
         row.contact_status?.[0]?.communication_status ?? "Nepoznat",
       header: "Status",
+      cell: ({ row }) => (
+        <StatusBadge
+          status={row.original.contact_status?.[0]?.communication_status}
+        />
+      ),
     },
     assignee,
     actions,
@@ -247,9 +253,9 @@ export function buildContactColumns({
 export function columnIdToLabel(columnId: string) {
   switch (columnId) {
     case "name":
-      return "Ime i Prezime";
+      return "Ime i prezime";
     case "company":
-      return "Firma";
+      return "Kompanija";
     case "job_title":
       return "Pozicija";
     case "city":
@@ -257,15 +263,15 @@ export function columnIdToLabel(columnId: string) {
     case "email":
       return "Email";
     case "mobile_phone":
-      return "Mobilni Telefon";
+      return "Mobilni telefon";
     case "phone":
-      return "Fiksni Telefon";
+      return "Fiksni telefon";
     case "created_at":
-      return "Dodat";
+      return "Dodato";
     case "contact_status":
       return "Status";
     case "assignee":
-      return "Dodeljen";
+      return "Dodeljeno";
     default:
       return columnId;
   }

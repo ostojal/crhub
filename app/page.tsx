@@ -1,4 +1,3 @@
-import { auth } from "@/auth";
 import { UserStatsView } from "@/components/analytics/user-stats";
 import { UsersSummaryTable } from "@/components/analytics/users-summary-table";
 import { PendingAccess } from "@/components/pending-access";
@@ -11,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { getUserStats, getUsersSummary } from "@/lib/analytics";
 import { ROLE_LABELS } from "@/lib/constants";
-import { getCurrentUser } from "@/lib/dal";
+import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -20,7 +19,7 @@ export default async function Home() {
   const user = await getCurrentUser();
 
   if (!user) {
-    const session = await auth();
+    const session = await getSession();
 
     return (
       <div className="flex flex-1 items-center justify-center bg-background px-4">
