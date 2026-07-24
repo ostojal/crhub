@@ -1,7 +1,7 @@
 import { ContactAdminActions } from "@/components/contacts/contact-admin-actions";
 import { CopyButton } from "@/components/copy-button";
+import { ContactButtons } from "@/components/email/contact-buttons";
 import { InteractionsList } from "@/components/interactions/interactions-list";
-import { LogInteractionButton } from "@/components/interactions/log-interaction-button";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -143,7 +143,11 @@ export default async function ContactDetailPage({
               currentTag={status?.interest_tag ?? null}
             />
           )}
-          <LogInteractionButton contactId={contact.id} contactName={name} />
+          <ContactButtons
+            contactId={contact.id}
+            contactName={name}
+            contactEmail={contact.email}
+          />
         </div>
       </div>
 

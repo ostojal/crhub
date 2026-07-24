@@ -16,6 +16,7 @@ import {
   ContactFormDialog,
 } from "@/components/contacts/contact-form-dialog";
 import { EditStatusDialog } from "@/components/contacts/edit-status-dialog";
+import { ComposeEmailDialog } from "@/components/email/compose-email-dialog";
 import {
   type LogContact,
   LogInteractionDialog,
@@ -250,6 +251,7 @@ export function ContactsTable({
   >(null);
   const [statusTarget, setStatusTarget] = useState<ContactRow | null>(null);
   const [logTarget, setLogTarget] = useState<LogContact | null>(null);
+  const [composeTarget, setComposeTarget] = useState<LogContact | null>(null);
 
   useEffect(() => {
     setPaginationState((prev) => ({
@@ -272,6 +274,8 @@ export function ContactsTable({
   const handlers: ContactActionHandlers = useMemo(
     () => ({
       onAssign: (contact) => setAssignTarget({ kind: "single", contact }),
+      onCompose: (contact) =>
+        setComposeTarget({ id: contact.id, name: contactName(contact) }),
       onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
       onEditStatus: setStatusTarget,
       onLog: (contact) =>
@@ -598,6 +602,15 @@ export function ContactsTable({
           key={logTarget.id}
           contacts={[logTarget]}
           onClose={() => setLogTarget(null)}
+        />
+      )}
+
+      {composeTarget && (
+        <ComposeEmailDialog
+          key={composeTarget.id}
+          contactId={composeTarget.id}
+          contactName={composeTarget.name}
+          onClose={() => setComposeTarget(null)}
         />
       )}
 

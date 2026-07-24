@@ -21,6 +21,11 @@ export type CommunicationStatus =
 
 export type InterestTag = "Bili zainteresovani" | "Za sledeći projekat";
 
+// Tabele za mejlove (db/emails.sql) — status je text sa CHECK ograničenjem,
+// ne Postgres enum
+export type EmailStatus =
+  "scheduled" | "sending" | "sent" | "failed" | "cancelled";
+
 export interface Database {
   public: {
     Tables: {
@@ -202,6 +207,191 @@ export interface Database {
             columns: ["contact_id"];
             isOneToOne: false;
             referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      google_tokens: {
+        Row: {
+          id: number;
+          user_id: number;
+          google_email: string;
+          refresh_token_enc: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: number;
+          google_email: string;
+          refresh_token_enc: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: number;
+          google_email?: string;
+          refresh_token_enc?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "google_tokens_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_templates: {
+        Row: {
+          id: number;
+          name: string;
+          subject: string;
+          body: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          subject: string;
+          body: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          subject?: string;
+          body?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      attachment_templates: {
+        Row: {
+          id: number;
+          name: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          storage_path?: string;
+          mime_type?: string;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      cc_bcc_options: {
+        Row: {
+          id: number;
+          email: string;
+          label: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          email: string;
+          label?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          email?: string;
+          label?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      emails: {
+        Row: {
+          id: number;
+          contact_id: number | null;
+          user_id: number;
+          to_email: string;
+          cc: string[];
+          bcc: string[];
+          subject: string;
+          body: string;
+          attachment_ids: number[];
+          status: EmailStatus;
+          scheduled_at: string;
+          claimed_at: string | null;
+          sent_at: string | null;
+          gmail_message_id: string | null;
+          error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          contact_id?: number | null;
+          user_id: number;
+          to_email: string;
+          cc?: string[];
+          bcc?: string[];
+          subject: string;
+          body: string;
+          attachment_ids?: number[];
+          status?: EmailStatus;
+          scheduled_at?: string;
+          claimed_at?: string | null;
+          sent_at?: string | null;
+          gmail_message_id?: string | null;
+          error?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          contact_id?: number | null;
+          user_id?: number;
+          to_email?: string;
+          cc?: string[];
+          bcc?: string[];
+          subject?: string;
+          body?: string;
+          attachment_ids?: number[];
+          status?: EmailStatus;
+          scheduled_at?: string;
+          claimed_at?: string | null;
+          sent_at?: string | null;
+          gmail_message_id?: string | null;
+          error?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "emails_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "emails_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];

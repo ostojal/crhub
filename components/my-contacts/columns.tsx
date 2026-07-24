@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatPhoneNumber } from "@/lib/format";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { PhoneOutgoingIcon } from "lucide-react";
+import { MailIcon, PhoneOutgoingIcon } from "lucide-react";
 import Link from "next/link";
 
 export type MyContact = {
@@ -37,8 +37,10 @@ export function contactDisplayName(contact: {
 }
 
 export function buildMyContactColumns({
+  onCompose,
   onLog,
 }: {
+  onCompose: (contact: MyContact) => void;
   onLog: (contact: MyContact) => void;
 }): ColumnDef<MyContact>[] {
   return [
@@ -135,14 +137,27 @@ export function buildMyContactColumns({
       id: "actions",
       header: () => <span className="sr-only">Akcije</span>,
       cell: ({ row }) => (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onLog(row.original)}
-        >
-          <PhoneOutgoingIcon data-icon="inline-start" />
-          Evidentiraj
-        </Button>
+        <div className="flex justify-end gap-1">
+          <Button
+            size="sm"
+            onClick={() => onCompose(row.original)}
+            disabled={!row.original.email}
+            title={
+              row.original.email ? undefined : "Kontakt nema email adresu"
+            }
+          >
+            <MailIcon data-icon="inline-start" />
+            Kontaktiraj
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onLog(row.original)}
+          >
+            <PhoneOutgoingIcon data-icon="inline-start" />
+            Evidentiraj
+          </Button>
+        </div>
       ),
     },
   ];

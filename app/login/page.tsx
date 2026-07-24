@@ -1,12 +1,14 @@
 import { signIn } from "@/auth";
+import { APP_NAME } from "@/lib/constants";
+import Link from "next/link";
 
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            CRHub
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
+            {APP_NAME}
           </h1>
           <p className="mt-2 text-sm text-foreground/60">
             Prijavi se da nastaviš
@@ -44,6 +46,12 @@ export default function LoginPage() {
             Nastavi sa Google
           </button>
         </form>
+
+        <p className="text-center text-sm text-foreground/60">
+          <Link href="/" className="underline underline-offset-4">
+            Šta je {APP_NAME}?
+          </Link>
+        </p>
       </div>
     </div>
   );

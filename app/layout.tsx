@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { SessionProvider } from "next-auth/react";
@@ -15,9 +16,13 @@ const robotoSlabHeading = Roboto_Slab({
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "CR HUB",
-  description: "CR HUB",
+  // Mora da se poklapa sa imenom aplikacije na Google OAuth consent screen-u
+  title: APP_NAME,
+  description:
+    "Interni CRM alat za vođenje poslovnih kontakata, raspodelu posla u timu i komunikaciju sa kontaktima.",
 
+  // Podrazumevano van pretrage; javna početna i politika privatnosti to
+  // pojedinačno nadjačavaju
   robots: {
     index: false,
   },

@@ -1,6 +1,6 @@
 import { signOut } from "@/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ROLE_LABELS } from "@/lib/constants";
+import { APP_NAME, ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
 import { LogOutIcon } from "lucide-react";
@@ -36,7 +36,7 @@ export default async function Navbar() {
               <FdLogo width={64} height={64} />
             </div>
 
-            <p className="font-heading font-semibold">CR HUB</p>
+            <p className="font-heading font-semibold">{APP_NAME}</p>
           </Link>
 
           {links.length > 0 && (

@@ -2,6 +2,7 @@
 
 import { CopyButton } from "@/components/copy-button";
 import { DataTable } from "@/components/data-table";
+import { ComposeEmailDialog } from "@/components/email/compose-email-dialog";
 import {
   type LogContact,
   LogInteractionDialog,
@@ -12,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { MobileCard, MobileField } from "@/components/ui/mobile-list";
 import { formatPhoneNumber } from "@/lib/format";
 import { format } from "date-fns";
-import { PhoneOutgoingIcon } from "lucide-react";
+import { MailIcon, PhoneOutgoingIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import type { Table as TanstackTable } from "@tanstack/react-table";
@@ -32,11 +33,17 @@ export function MyContactsView({
   pagesCount: number;
 }) {
   const [logTargets, setLogTargets] = useState<LogContact[] | null>(null);
+  const [composeTarget, setComposeTarget] = useState<LogContact | null>(null);
   const tableRef = useRef<TanstackTable<MyContact> | null>(null);
 
   const columns = useMemo(
     () =>
       buildMyContactColumns({
+        onCompose: (contact) =>
+          setComposeTarget({
+            id: contact.id,
+            name: contactDisplayName(contact),
+          }),
         onLog: (contact) =>
           setLogTargets([
             { id: contact.id, name: contactDisplayName(contact) },
@@ -108,19 +115,38 @@ export function MyContactsView({
                 </MobileField>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() =>
-                  setLogTargets([
-                    { id: contact.id, name: contactDisplayName(contact) },
-                  ])
-                }
-              >
-                <PhoneOutgoingIcon data-icon="inline-start" />
-                Evidentiraj
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  disabled={!contact.email}
+                  title={
+                    contact.email ? undefined : "Kontakt nema email adresu"
+                  }
+                  onClick={() =>
+                    setComposeTarget({
+                      id: contact.id,
+                      name: contactDisplayName(contact),
+                    })
+                  }
+                >
+                  <MailIcon data-icon="inline-start" />
+                  Kontaktiraj
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() =>
+                    setLogTargets([
+                      { id: contact.id, name: contactDisplayName(contact) },
+                    ])
+                  }
+                >
+                  <PhoneOutgoingIcon data-icon="inline-start" />
+                  Evidentiraj
+                </Button>
+              </div>
             </MobileCard>
           );
         }}
@@ -165,6 +191,15 @@ export function MyContactsView({
             setLogTargets(null);
             tableRef.current?.resetRowSelection();
           }}
+        />
+      )}
+
+      {composeTarget && (
+        <ComposeEmailDialog
+          key={composeTarget.id}
+          contactId={composeTarget.id}
+          contactName={composeTarget.name}
+          onClose={() => setComposeTarget(null)}
         />
       )}
     </>

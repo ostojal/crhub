@@ -1,0 +1,128 @@
+# Slanje mejlova iz aplikacije (Gmail API)
+
+Korisnik otvara kompozer sa dugmeta **Kontaktiraj**, bira šablon za naslov i
+telo, CC/BCC sa liste koju održava admin i priloge koje je admin otpremio.
+Mejl ide sa njegovog Gmail naloga — odmah ili zakazano — i automatski se
+evidentira kao kontaktiranje, pa ga postojeća analitika hvata bez izmena.
+
+Ručno evidentiranje (pozivi, LinkedIn, mejlovi poslati van aplikacije) ostaje
+kao sekundarno dugme **Evidentiraj**.
+
+## 1. Google Cloud
+
+Sve se radi u **istom projektu** u kom već postoji OAuth klijent za prijavu.
+
+1. **Uključi Gmail API**
+   APIs & Services → Library → _Gmail API_ → **Enable**.
+   Ništa drugo se ne uključuje — bez service account-a, bez Pub/Sub-a.
+
+2. **OAuth consent screen**
+   - Dodaj scope `https://www.googleapis.com/auth/gmail.send` (Google ga
+     označava kao _sensitive_).
+   - **Objavi aplikaciju u Production** (dugme _Publish app_).
+     ⚠️ Ovo je važno: u _Testing_ modu Google gasi refresh tokene posle 7 dana,
+     pa bi svima veza pucala jednom nedeljno.
+   - Pošto aplikacija nije prošla Google verifikaciju, pri povezivanju naloga
+     se javlja ekran „Google hasn't verified this app” → _Advanced_ →
+     _Go to … (unsafe)_. To je očekivano i bezbedno za interni tim
+     (ograničenje neverifikovanih aplikacija je 100 korisnika).
+
+3. **Credentials → postojeći OAuth 2.0 Client ID**
+   U _Authorized redirect URIs_ dodaj:
+
+   ```
+   http://localhost:3000/api/google/callback
+   https://<prod-domen>/api/google/callback
+   ```
+
+   Postojeći `…/api/auth/callback/google` (prijava) ostaje netaknut — tok
+   prijave se ne menja.
+
+4. **Ako tražiš verifikaciju aplikacije** (Google to traži za _sensitive_
+   scope kad se aplikacija objavi), u _Branding_ / _OAuth consent screen_
+   podesi:
+   - _App name_: **CR HUB** — mora se poklapati sa imenom na stranici
+     (`APP_NAME` u `lib/constants.ts`).
+   - _Application home page_: `https://<prod-domen>/`
+   - _Application privacy policy link_: `https://<prod-domen>/privatnost`
+
+   Obe stranice su namerno **javne** (vidi `PUBLIC_PATHS` u `proxy.ts`) —
+   Google-ov recenzent nije prijavljen, pa bi iza prijave video samo ekran za
+   login i odbio verifikaciju. Domen još treba potvrditi u Google Search
+   Console-u pod istim nalogom.
+
+## 2. Supabase
+
+U SQL editoru pokreni redom:
+
+1. `db/emails.sql` — tabele (`google_tokens`, `email_templates`,
+   `attachment_templates`, `cc_bcc_options`, `emails`) i privatni Storage
+   bucket `email-attachments`.
+2. `db/email-cron.sql` — cron koji svakog minuta poziva aplikaciju da pošalje
+   dospele zakazane mejlove. **Pre pokretanja zameni** `YOUR_APP_URL` i
+   `YOUR_CRON_SECRET` u fajlu. Pokreni tek kad je aplikacija deployovana.
+
+Obe skripte su idempotentne.
+
+## 3. Env varovi
+
+Uz postojeće, dodaj (lokalno u `.env.local`, na Vercelu u Project Settings →
+Environment Variables):
+
+| Var                    | Šta je                                            | Kako se pravi                                          |
+| ---------------------- | ------------------------------------------------- | ------------------------------------------------------ |
+| `APP_URL`              | osnovni URL aplikacije, bez kose crte na kraju    | `http://localhost:3000` lokalno, prod domen na Vercelu |
+| `GOOGLE_TOKEN_ENC_KEY` | ključ kojim se šifruje Gmail refresh token u bazi | `openssl rand -base64 32`                              |
+| `CRON_SECRET`          | tajna kojom se štiti `/api/emails/process`        | `openssl rand -hex 32`                                 |
+
+`GOOGLE_TOKEN_ENC_KEY` mora biti isti u svim okruženjima koja dele bazu —
+promena ključa čini postojeće tokene nečitljivim i svi moraju ponovo da povežu
+nalog.
+
+## 4. Kako se koristi
+
+- **Admin** na `/admin/mejlovi` pravi šablone (u naslovu i telu može
+  `{{ime}}`, `{{prezime}}`, `{{firma}}`, `{{pozicija}}`, `{{grad}}`), otprema
+  priloge (do 4 MB po fajlu) i dodaje CC/BCC adrese.
+- **Svaki korisnik** na `/mejlovi` jednom klikne _Poveži Gmail_. Povezuje se
+  isključivo nalog sa kojim je prijavljen u aplikaciju — drugi Google nalog
+  aplikacija odbija.
+- Kompozer se otvara sa **Kontaktiraj** na strani kontakta, u _Mojim
+  kontaktima_ (red i mobilna kartica) i iz menija u admin tabeli kontakata.
+- Poslati i zakazani mejlovi se vide na `/mejlovi`; zakazani se mogu otkazati
+  dok ih cron ne preuzme.
+
+Po uspešnom slanju upisuje se interakcija tipa _Email_, a status kontakta se
+podiže na „Poslato” samo ako je bio „Nije kontaktiran” — bolji ishodi
+(„Dobijen odgovor”, „Prihvaćeno”…) se ne vraćaju unazad.
+
+## 5. Provera i rešavanje problema
+
+Ručno pokretanje obrade zakazanih mejlova (bez čekanja cron-a):
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  http://localhost:3000/api/emails/process
+# → {"sent":1,"failed":0,"skipped":0,"swept":0}
+```
+
+U Supabase-u:
+
+```sql
+select jobname, schedule, active from cron.job;                     -- posao postoji?
+select id, status_code, content, created                            -- 200 = ok, 401 = pogrešna tajna
+  from net._http_response order by id desc limit 5;
+select id, status, error, scheduled_at from public.emails           -- stanje outbox-a
+  order by id desc limit 20;
+```
+
+Česti slučajevi:
+
+- **„Gmail veza je istekla”** — korisnik je opozvao pristup ili je aplikacija
+  ostala u _Testing_ modu. Veza se označi kao neispravna, a korisnik na
+  `/mejlovi` dobija poziv da poveže nalog ponovo.
+- **Mejl u statusu „Neuspešan”** — razlog piše uz sam mejl. Nema automatskog
+  ponavljanja; mejl se sastavlja ponovo (svesna odluka, da se ne bi desilo
+  dvostruko slanje).
+- **Zakazani mejl kasni** — cron radi u minutnom ritmu, pa je odstupanje do
+  ~1 minut normalno.

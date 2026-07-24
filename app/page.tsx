@@ -1,5 +1,6 @@
 import { UserStatsView } from "@/components/analytics/user-stats";
 import { UsersSummaryTable } from "@/components/analytics/users-summary-table";
+import { Landing } from "@/components/landing";
 import { PendingAccess } from "@/components/pending-access";
 import {
   Card,
@@ -13,17 +14,30 @@ import { ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
 import Link from "next/link";
 
+// Neprijavljen posetilac na "/" vidi javnu stranicu, pa i pretraživači smeju
+// da je indeksiraju (ostatak aplikacije ostaje noindex iz layout.tsx)
+export const metadata: Metadata = {
+  description:
+    "CR HUB je interni CRM alat za vođenje poslovnih kontakata, raspodelu posla u timu, evidenciju kontaktiranja i slanje mejlova iz aplikacije.",
+  robots: { index: true, follow: true },
+};
+
 export default async function Home() {
+  const session = await getSession();
+
+  // Javna stranica: opisuje čemu aplikacija služi i kako koristi Google
+  // podatke (uslov Google-ove OAuth verifikacije)
+  if (!session?.user) return <Landing />;
+
   const user = await getCurrentUser();
 
   if (!user) {
-    const session = await getSession();
-
     return (
       <div className="flex flex-1 items-center justify-center bg-background px-4">
-        <PendingAccess email={session?.user?.email ?? ""} />
+        <PendingAccess email={session.user.email ?? ""} />
       </div>
     );
   }

@@ -11,6 +11,7 @@ import {
   NotebookPenIcon,
   PhoneCallIcon,
   PhoneOutgoingIcon,
+  SendIcon,
   Trash2Icon,
   UserRoundMinus,
   UserRoundPlusIcon,
@@ -48,6 +49,7 @@ import { NotesDialog } from "./notes-dialog";
 
 export type ContactActionHandlers = {
   onAssign: (contact: ContactRow) => void;
+  onCompose: (contact: ContactRow) => void;
   onEdit: (contact: ContactRow) => void;
   onEditStatus: (contact: ContactRow) => void;
   onLog: (contact: ContactRow) => void;
@@ -108,9 +110,17 @@ export function ContactActions({
               </Link>
             </DropdownMenuItem>
 
+            <DropdownMenuItem
+              disabled={!contact.email}
+              onSelect={() => handlers.onCompose(contact)}
+            >
+              <SendIcon />
+              Kontaktiraj (mejl)
+            </DropdownMenuItem>
+
             <DropdownMenuItem onSelect={() => handlers.onLog(contact)}>
               <PhoneOutgoingIcon />
-              Kontaktiraj
+              Evidentiraj kontaktiranje
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

@@ -14,9 +14,19 @@ export const NAV_LINKS: Record<Role, NavLink[]> = {
       description: "Svi kontakti, dodele i izmene",
     },
     {
+      href: "/mejlovi",
+      label: "Mejlovi",
+      description: "Poslati i zakazani mejlovi",
+    },
+    {
       href: "/admin/users",
       label: "Korisnici",
       description: "Uloge i pristup članova tima",
+    },
+    {
+      href: "/admin/mejlovi",
+      label: "Mejl šabloni",
+      description: "Šabloni, prilozi i CC/BCC adrese",
     },
     {
       href: "/analitika",
@@ -36,6 +46,11 @@ export const NAV_LINKS: Record<Role, NavLink[]> = {
       href: "/moji-kontakti",
       label: "Moji kontakti",
       description: "Kontakti dodeljeni tebi",
+    },
+    {
+      href: "/mejlovi",
+      label: "Mejlovi",
+      description: "Poslati i zakazani mejlovi",
     },
     {
       href: "/analitika",
