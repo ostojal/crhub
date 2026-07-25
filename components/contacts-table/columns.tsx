@@ -1,13 +1,9 @@
+import { CategoryBadge } from "@/components/category-badge";
 import { CopyButton } from "@/components/copy-button";
 import { dashValue, SortableColumnHeader } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  CONTACT_CATEGORIES,
-  CONTACT_CATEGORY_LABELS,
-  type Role,
-} from "@/lib/constants";
+import { CONTACT_CATEGORIES, type Role } from "@/lib/constants";
 import { formatPhoneNumber } from "@/lib/format";
 import { isOneOf } from "@/lib/validate";
 import { ColumnDef } from "@tanstack/react-table";
@@ -180,14 +176,6 @@ export function buildContactColumns({
     company,
     jobTitle,
     {
-      id: "city",
-      accessorKey: "city",
-      header: ({ column }) => (
-        <SortableColumnHeader column={column} title="Grad" />
-      ),
-      cell: ({ getValue }) => dashValue(getValue()),
-    },
-    {
       id: "category",
       accessorKey: "category",
       header: "Kategorija",
@@ -196,9 +184,7 @@ export function buildContactColumns({
         if (!value || !isOneOf(value, CONTACT_CATEGORIES)) {
           return <span className="text-muted-foreground">-</span>;
         }
-        return (
-          <Badge variant="outline">{CONTACT_CATEGORY_LABELS[value]}</Badge>
-        );
+        return <CategoryBadge category={value} />;
       },
     },
     {
@@ -217,30 +203,14 @@ export function buildContactColumns({
       ),
     },
     {
-      id: "mobile_phone",
-      header: "Mobilni telefon",
-      accessorFn: (row) => formatPhoneNumber(row.mobile_phone),
-      cell: ({ row, getValue }) => (
-        <div className="flex items-center gap-1">
-          {dashValue(getValue())}
-          {row.original.mobile_phone && (
-            <CopyButton
-              value={row.original.mobile_phone}
-              label="Mobilni telefon"
-            />
-          )}
-        </div>
-      ),
-    },
-    {
       id: "phone",
-      header: "Fiksni telefon",
+      header: "Telefon",
       accessorFn: (row) => formatPhoneNumber(row.phone),
       cell: ({ row, getValue }) => (
         <div className="flex items-center gap-1">
           {dashValue(getValue())}
           {row.original.phone && (
-            <CopyButton value={row.original.phone} label="Fiksni telefon" />
+            <CopyButton value={row.original.phone} label="Telefon" />
           )}
         </div>
       ),
@@ -278,16 +248,12 @@ export function columnIdToLabel(columnId: string) {
       return "Kompanija";
     case "job_title":
       return "Pozicija";
-    case "city":
-      return "Grad";
     case "category":
       return "Kategorija";
     case "email":
       return "Email";
-    case "mobile_phone":
-      return "Mobilni telefon";
     case "phone":
-      return "Fiksni telefon";
+      return "Telefon";
     case "created_at":
       return "Dodato";
     case "contact_status":

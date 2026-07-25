@@ -18,38 +18,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateContactStatus } from "@/lib/actions/contacts";
+import { updateContactsStatus } from "@/lib/actions/contacts";
 import { COMMUNICATION_STATUSES, INTEREST_TAGS } from "@/lib/constants";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 const NO_TAG = "none";
+const KEEP_TAG = "keep";
 
+export type StatusContact = { id: number; name: string };
+
+// Radi i za jedan i za više kontakata odjednom. Pri masovnoj izmeni oznaka
+// podrazumevano ostaje netaknuta jer izabrani kontakti imaju različite.
 export function EditStatusDialog({
-  contactId,
-  contactName,
+  contacts,
   currentStatus,
   currentTag,
   onClose,
 }: {
-  contactId: number;
-  contactName: string;
-  currentStatus: string | null;
-  currentTag: string | null;
+  contacts: StatusContact[];
+  currentStatus?: string | null;
+  currentTag?: string | null;
   onClose: () => void;
 }) {
+  const isBulk = contacts.length > 1;
+
   const [status, setStatus] = useState<string>(
     currentStatus ?? COMMUNICATION_STATUSES[0],
   );
-  const [tag, setTag] = useState<string>(currentTag ?? NO_TAG);
+  const [tag, setTag] = useState<string>(
+    isBulk ? KEEP_TAG : (currentTag ?? NO_TAG),
+  );
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = () => {
     startTransition(async () => {
-      const result = await updateContactStatus(
-        contactId,
+      const result = await updateContactsStatus(
+        contacts.map((c) => c.id),
         status,
-        tag === NO_TAG ? null : tag,
+        tag === KEEP_TAG ? undefined : tag === NO_TAG ? null : tag,
       );
 
       if (result.ok) {
@@ -65,9 +72,18 @@ export function EditStatusDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Izmeni status</DialogTitle>
+          <DialogTitle>
+            {isBulk ? `Izmeni status (${contacts.length})` : "Izmeni status"}
+          </DialogTitle>
           <DialogDescription>
-            Kontakt: <span className="font-medium">{contactName}</span>
+            {isBulk ? (
+              <>Kontakti: {contacts.map((c) => c.name).join(", ")}</>
+            ) : (
+              <>
+                Kontakt:{" "}
+                <span className="font-medium">{contacts[0]?.name}</span>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,6 +111,7 @@ export function EditStatusDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                {isBulk && <SelectItem value={KEEP_TAG}>Ne menjaj</SelectItem>}
                 <SelectItem value={NO_TAG}>Bez oznake</SelectItem>
                 {INTEREST_TAGS.map((t) => (
                   <SelectItem key={t} value={t}>

@@ -21,6 +21,7 @@ import {
   type LogContact,
   LogInteractionDialog,
 } from "@/components/interactions/log-interaction-dialog";
+import { CategoryBadge } from "@/components/category-badge";
 import { CopyButton } from "@/components/copy-button";
 import { StatusBadge } from "@/components/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +41,7 @@ import {
   type Role,
 } from "@/lib/constants";
 import { formatPhoneNumber } from "@/lib/format";
+import { isOneOf } from "@/lib/validate";
 import { format } from "date-fns";
 import {
   ChevronsLeftIcon,
@@ -128,6 +130,10 @@ function ContactMobileCard({
   const isAdmin = viewer === "admin";
   const assignee = getAssigneeName(contact);
   const status = contact.contact_status?.[0]?.communication_status;
+  const category =
+    contact.category && isOneOf(contact.category, CONTACT_CATEGORIES)
+      ? contact.category
+      : null;
 
   return (
     <MobileCard className="space-y-2">
@@ -172,8 +178,10 @@ function ContactMobileCard({
         {contact.job_title && (
           <MobileField label="Pozicija">{contact.job_title}</MobileField>
         )}
-        {isAdmin && contact.city && (
-          <MobileField label="Grad">{contact.city}</MobileField>
+        {isAdmin && category && (
+          <MobileField label="Kategorija">
+            <CategoryBadge category={category} />
+          </MobileField>
         )}
         {isAdmin && contact.email && (
           <MobileField label="Email">
@@ -183,22 +191,11 @@ function ContactMobileCard({
             </span>
           </MobileField>
         )}
-        {isAdmin && contact.mobile_phone && (
-          <MobileField label="Mobilni">
-            <span className="inline-flex items-center gap-1">
-              {formatPhoneNumber(contact.mobile_phone)}
-              <CopyButton
-                value={contact.mobile_phone}
-                label="Mobilni telefon"
-              />
-            </span>
-          </MobileField>
-        )}
         {isAdmin && contact.phone && (
-          <MobileField label="Fiksni">
+          <MobileField label="Telefon">
             <span className="inline-flex items-center gap-1">
               {formatPhoneNumber(contact.phone)}
-              <CopyButton value={contact.phone} label="Fiksni telefon" />
+              <CopyButton value={contact.phone} label="Telefon" />
             </span>
           </MobileField>
         )}
@@ -268,8 +265,10 @@ export function ContactsTable({
   const [formTarget, setFormTarget] = useState<
     { mode: "create" } | { mode: "edit"; contact: ContactRow } | null
   >(null);
-  const [statusTarget, setStatusTarget] = useState<ContactRow | null>(null);
-  const [logTarget, setLogTarget] = useState<LogContact | null>(null);
+  // Dijalozi za status i kontaktiranje rade i za jedan i za više kontakata,
+  // pa im je meta uvek lista
+  const [statusTarget, setStatusTarget] = useState<ContactRow[] | null>(null);
+  const [logTarget, setLogTarget] = useState<LogContact[] | null>(null);
   const [composeTarget, setComposeTarget] = useState<LogContact | null>(null);
 
   useEffect(() => {
@@ -296,9 +295,9 @@ export function ContactsTable({
       onCompose: (contact) =>
         setComposeTarget({ id: contact.id, name: contactName(contact) }),
       onEdit: (contact) => setFormTarget({ mode: "edit", contact }),
-      onEditStatus: setStatusTarget,
+      onEditStatus: (contact) => setStatusTarget([contact]),
       onLog: (contact) =>
-        setLogTarget({ id: contact.id, name: contactName(contact) }),
+        setLogTarget([{ id: contact.id, name: contactName(contact) }]),
     }),
     [],
   );
@@ -476,7 +475,7 @@ export function ContactsTable({
         )}
       </div>
 
-      <div className="mt-2 flex min-h-8 items-end justify-between">
+      <div className="mt-2 flex min-h-8 flex-wrap items-end justify-between gap-2">
         <p className="text-end text-sm text-muted-foreground">
           Prikazano {table.getRowModel().rows.length} od {contactsCount} redova
           {table.getFilteredSelectedRowModel().rows.length > 0 &&
@@ -491,6 +490,12 @@ export function ContactsTable({
               .rows.map((x) => x.original)}
             viewer={viewer}
             onAssign={(contacts) => setAssignTarget({ kind: "bulk", contacts })}
+            onEditStatus={setStatusTarget}
+            onLog={(contacts) =>
+              setLogTarget(
+                contacts.map((c) => ({ id: c.id, name: contactName(c) })),
+              )
+            }
             onDone={() => table.resetRowSelection()}
           />
         )}
@@ -643,9 +648,12 @@ export function ContactsTable({
 
       {logTarget && (
         <LogInteractionDialog
-          key={logTarget.id}
-          contacts={[logTarget]}
-          onClose={() => setLogTarget(null)}
+          key={logTarget.map((c) => c.id).join(",")}
+          contacts={logTarget}
+          onClose={() => {
+            if (logTarget.length > 1) table.resetRowSelection();
+            setLogTarget(null);
+          }}
         />
       )}
 
@@ -660,14 +668,28 @@ export function ContactsTable({
 
       {statusTarget && (
         <EditStatusDialog
-          key={statusTarget.id}
-          contactId={statusTarget.id}
-          contactName={contactName(statusTarget)}
+          key={statusTarget.map((c) => c.id).join(",")}
+          contacts={statusTarget.map((contact) => ({
+            id: contact.id,
+            name: contactName(contact),
+          }))}
+          // Postojeći status/oznaka se predlažu samo kad je izabran jedan
+          // kontakt — kod više njih nema jedne zajedničke vrednosti
           currentStatus={
-            statusTarget.contact_status?.[0]?.communication_status ?? null
+            statusTarget.length === 1
+              ? (statusTarget[0].contact_status?.[0]?.communication_status ??
+                null)
+              : undefined
           }
-          currentTag={statusTarget.contact_status?.[0]?.interest_tag ?? null}
-          onClose={() => setStatusTarget(null)}
+          currentTag={
+            statusTarget.length === 1
+              ? (statusTarget[0].contact_status?.[0]?.interest_tag ?? null)
+              : undefined
+          }
+          onClose={() => {
+            if (statusTarget.length > 1) table.resetRowSelection();
+            setStatusTarget(null);
+          }}
         />
       )}
     </div>

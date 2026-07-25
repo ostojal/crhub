@@ -238,32 +238,62 @@ export async function deleteContacts(
   return { ok: true, message: `Obrisano kontakata: ${contactIds.length}.` };
 }
 
-export async function updateContactStatus(
-  contactId: number,
+// Menja status jednog ili više kontakata. `interestTag === undefined` znači
+// „ne diraj oznaku" — pri masovnoj izmeni kontakti imaju različite oznake, pa
+// bi ih jedna vrednost sve pregazila.
+export async function updateContactsStatus(
+  contactIds: number[],
   status: string,
-  interestTag: string | null,
+  interestTag: string | null | undefined,
 ): Promise<ActionResult> {
   const me = await checkRole("admin");
   if (!me) return { ok: false, error: NO_PERMISSION };
 
-  if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
+  if (
+    !Array.isArray(contactIds) ||
+    contactIds.length === 0 ||
+    contactIds.length > MAX_BULK ||
+    !contactIds.every(isId)
+  ) {
+    return { ok: false, error: "Neispravan izbor kontakata." };
+  }
   if (!isOneOf(status, COMMUNICATION_STATUSES)) {
     return { ok: false, error: "Nepoznat status." };
   }
-  if (interestTag !== null && !isOneOf(interestTag, INTEREST_TAGS)) {
+  if (
+    interestTag !== undefined &&
+    interestTag !== null &&
+    !isOneOf(interestTag, INTEREST_TAGS)
+  ) {
     return { ok: false, error: "Nepoznata oznaka." };
   }
 
   const supabase = createClient();
-  const statusOk = await setContactStatus(
-    supabase,
-    contactId,
-    { communication_status: status, interest_tag: interestTag },
-    me.email,
-  );
 
-  if (!statusOk) return { ok: false, error: "Greška pri izmeni statusa." };
+  for (const contactId of contactIds) {
+    const statusOk = await setContactStatus(
+      supabase,
+      contactId,
+      {
+        communication_status: status,
+        ...(interestTag !== undefined && { interest_tag: interestTag }),
+      },
+      me.email,
+    );
 
-  revalidateContactPaths(contactId);
-  return { ok: true, message: "Status je izmenjen." };
+    if (!statusOk) return { ok: false, error: "Greška pri izmeni statusa." };
+  }
+
+  revalidateContactPaths();
+  for (const contactId of contactIds) {
+    revalidatePath(`/contacts/${contactId}`);
+  }
+
+  return {
+    ok: true,
+    message:
+      contactIds.length > 1
+        ? `Status je izmenjen za ${contactIds.length} kontakata.`
+        : "Status je izmenjen.",
+  };
 }

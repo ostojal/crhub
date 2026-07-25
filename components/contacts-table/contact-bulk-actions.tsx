@@ -1,6 +1,12 @@
 "use client";
 
-import { Trash2Icon, UserRoundMinus, UserRoundPlusIcon } from "lucide-react";
+import {
+  InfoIcon,
+  PhoneOutgoingIcon,
+  Trash2Icon,
+  UserRoundMinus,
+  UserRoundPlusIcon,
+} from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { unassignContacts } from "@/lib/actions/assignments";
@@ -16,25 +22,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import { Button } from "../ui/button";
 import { type ContactRow } from "./columns";
 
+// Sve akcije stoje odmah u traci — bez međukoraka kroz meni, jer se traka i
+// tako pojavljuje tek kad postoji izbor
 export function ContactBulkActions({
   contacts,
   viewer,
   onAssign,
+  onEditStatus,
+  onLog,
   onDone,
 }: {
   contacts: ContactRow[];
   viewer: "admin" | "editor";
   onAssign: (contacts: ContactRow[]) => void;
+  onEditStatus: (contacts: ContactRow[]) => void;
+  onLog: (contacts: ContactRow[]) => void;
   onDone: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -67,69 +72,81 @@ export function ContactBulkActions({
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={isPending}>
-          Bulk Actions
-        </Button>
-      </DropdownMenuTrigger>
+    <div className="flex flex-wrap justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() => onAssign(contacts)}
+      >
+        <UserRoundPlusIcon data-icon="inline-start" />
+        Dodeli pristup
+      </Button>
 
-      <DropdownMenuContent className="min-w-max">
-        <DropdownMenuItem onSelect={() => onAssign(contacts)}>
-          <UserRoundPlusIcon />
-          Dodeli Pristup
-        </DropdownMenuItem>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={handleUnassign}
+      >
+        <UserRoundMinus data-icon="inline-start" />
+        Ukloni pristup
+      </Button>
 
-        <DropdownMenuItem onSelect={handleUnassign}>
-          <UserRoundMinus />
-          Ukloni Pristup
-        </DropdownMenuItem>
+      {isAdmin && (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onEditStatus(contacts)}
+          >
+            <InfoIcon data-icon="inline-start" />
+            Promeni status
+          </Button>
 
-        {isAdmin && (
-          <>
-            <DropdownMenuSeparator />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => onLog(contacts)}
+          >
+            <PhoneOutgoingIcon data-icon="inline-start" />
+            Evidentiraj kontaktiranje
+          </Button>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                  }}
-                >
-                  <Trash2Icon />
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="destructive" disabled={isPending}>
+                <Trash2Icon data-icon="inline-start" />
+                Obriši
+              </Button>
+            </AlertDialogTrigger>
+
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Da li ste sigurni da želite da obrišete {contacts.length}{" "}
+                  kontakata?
+                </AlertDialogTitle>
+
+                <AlertDialogDescription>
+                  Ova akcija je nepovratna. Svi izabrani kontakti će biti trajno
+                  obrisani iz baze podataka bez mogućnosti vraćanja, zajedno sa
+                  istorijom kontaktiranja i dodelama.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel>Odustani</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={isPending}>
                   Obriši
-                </DropdownMenuItem>
-              </AlertDialogTrigger>
-
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Da li ste sigurni da želite da obrišete {contacts.length}{" "}
-                    kontakata?
-                  </AlertDialogTitle>
-
-                  <AlertDialogDescription>
-                    Ova akcija je nepovratna. Svi izabrani kontakti će biti
-                    trajno obrisani iz baze podataka bez mogućnosti vraćanja,
-                    zajedno sa istorijom kontaktiranja i dodelama.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Odustani</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    disabled={isPending}
-                  >
-                    Obriši
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
+    </div>
   );
 }

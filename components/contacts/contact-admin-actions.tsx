@@ -41,8 +41,7 @@ export function ContactAdminActions({
 
       {dialog === "status" && (
         <EditStatusDialog
-          contactId={contact.id}
-          contactName={contactName}
+          contacts={[{ id: contact.id, name: contactName }]}
           currentStatus={currentStatus}
           currentTag={currentTag}
           onClose={() => setDialog(null)}

@@ -183,7 +183,7 @@ export default async function CompanyPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="px-4">Ime i Prezime</TableHead>
+              <TableHead className="px-4">Ime i prezime</TableHead>
               <TableHead className="px-4">Pozicija</TableHead>
               <TableHead className="px-4">Grad</TableHead>
               <TableHead className="px-4">Telefon</TableHead>

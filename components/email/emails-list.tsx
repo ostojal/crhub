@@ -263,6 +263,7 @@ export function EmailsList({ emails }: { emails: EmailListItem[] }) {
           contactName={draft.contactName ?? draft.toEmail}
           draft={{
             id: draft.id,
+            toEmail: draft.toEmail,
             subject: draft.subject,
             body: draft.body,
             ccIds: draft.ccIds,

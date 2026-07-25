@@ -14,7 +14,7 @@ import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
 import { claimEmail, sendClaimedEmail } from "@/lib/email/send";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
-import { cleanText, isId } from "@/lib/validate";
+import { cleanText, isId, normalizeEmail } from "@/lib/validate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 
@@ -142,6 +142,8 @@ export async function getComposeContext(
 
 export type ComposeEmailInput = {
   contactId: number;
+  // Adresa primaoca; prazno znači „adresa sa kontakta"
+  to?: string;
   cc: number[];
   bcc: number[];
   subject: string;
@@ -179,6 +181,8 @@ type ParsedEmail =
       ok: true;
       subject: string;
       body: string;
+      // null = pošiljalac nije menjao primaoca, uzima se adresa sa kontakta
+      to: string | null;
       cc: string[];
       bcc: string[];
       scheduledAt: string | null;
@@ -198,6 +202,13 @@ async function parseEmailContent(
   }
   if (!isIdList(input.attachmentIds, MAX_ATTACHMENTS)) {
     return { ok: false, error: "Neispravan izbor priloga." };
+  }
+
+  // Primalac je izmenjiv u kompozeru, pa se adresa proverava kao unos
+  const rawTo = cleanText(input.to, 200);
+  const to = rawTo ? normalizeEmail(rawTo) : null;
+  if (rawTo && !to) {
+    return { ok: false, error: "Email adresa primaoca nije ispravna." };
   }
 
   const subject = cleanText(input.subject, 300);
@@ -265,7 +276,7 @@ async function parseEmailContent(
     }
   }
 
-  return { ok: true, subject, body, cc, bcc, scheduledAt };
+  return { ok: true, subject, body, to, cc, bcc, scheduledAt };
 }
 
 export async function composeEmail(
@@ -292,8 +303,11 @@ export async function composeEmail(
     .eq("id", input.contactId)
     .maybeSingle();
 
-  if (!contact?.email) {
-    return { ok: false, error: "Kontakt nema email adresu." };
+  // Uneta adresa ima prednost nad onom iz baze; kontakt bez adrese se može
+  // kontaktirati samo ako je pošiljalac upisao primaoca ručno
+  const toEmail = parsed.to ?? contact?.email ?? null;
+  if (!toEmail) {
+    return { ok: false, error: "Unesi email adresu primaoca." };
   }
 
   const { data: created, error } = await supabase
@@ -301,7 +315,7 @@ export async function composeEmail(
     .insert({
       contact_id: input.contactId,
       user_id: me.id,
-      to_email: contact.email,
+      to_email: toEmail,
       cc,
       bcc,
       subject,
@@ -472,6 +486,7 @@ export async function updateScheduledEmail(
       cc: parsed.cc,
       bcc: parsed.bcc,
       attachment_ids: input.attachmentIds,
+      ...(parsed.to && { to_email: parsed.to }),
       ...(parsed.scheduledAt && { scheduled_at: parsed.scheduledAt }),
     })
     .eq("id", emailId)

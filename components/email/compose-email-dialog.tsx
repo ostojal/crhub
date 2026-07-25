@@ -68,6 +68,7 @@ function signatureBlock(
 // Zakazani mejl koji se menja umesto da se pravi novi
 export type EmailDraft = {
   id: number;
+  toEmail: string;
   subject: string;
   body: string;
   ccIds: number[];
@@ -92,6 +93,9 @@ export function ComposeEmailDialog({
 
   const [context, setContext] = useState<ComposeContext | null>(null);
   const [templateId, setTemplateId] = useState(NO_TEMPLATE);
+  // Adresa kontakta je samo predlog — pošiljalac je može izmeniti (npr. lična
+  // umesto opšte adrese firme). Ne menja podatke o kontaktu.
+  const [to, setTo] = useState(draft?.toEmail ?? "");
   const [subject, setSubject] = useState(draft?.subject ?? "");
   const [body, setBody] = useState(draft?.body ?? "");
   // Menja se kad potpis stigne sa servera, da se editor remountuje sa njim
@@ -117,13 +121,17 @@ export function ComposeEmailDialog({
 
       setContext(result);
 
-      // Potpis se odmah upisuje u telo (kao u Gmailu) da korisnik vidi i
-      // može da ga izmeni pre slanja. Pri izmeni je već u tekstu.
-      if (!isEdit && result.ok && result.signature) {
-        setBody(
-          signatureBlock(result.signature, result.contact, result.sender),
-        );
-        setSignatureLoaded(true);
+      if (!isEdit && result.ok) {
+        setTo(result.contact.email ?? "");
+
+        // Potpis se odmah upisuje u telo (kao u Gmailu) da korisnik vidi i
+        // može da ga izmeni pre slanja. Pri izmeni je već u tekstu.
+        if (result.signature) {
+          setBody(
+            signatureBlock(result.signature, result.contact, result.sender),
+          );
+          setSignatureLoaded(true);
+        }
       }
     });
 
@@ -165,6 +173,7 @@ export function ComposeEmailDialog({
     }
 
     const payload = {
+      to,
       cc,
       bcc,
       subject,
@@ -232,152 +241,154 @@ export function ComposeEmailDialog({
 
         {context?.ok && context.gmail === "connected" && (
           <>
-            {!context.contact.email ? (
-              <p className="py-6 text-sm text-muted-foreground">
-                Ovaj kontakt nema email adresu, pa mu se ne može poslati mejl.
-              </p>
-            ) : (
-              <div className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-to">Prima</Label>
+                <Input
+                  id="email-to"
+                  type="email"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  placeholder="ime@firma.rs"
+                />
+                {!context.contact.email && (
+                  <p className="text-xs text-muted-foreground">
+                    Kontakt nema sačuvanu email adresu — upiši je ovde. Mejl se
+                    evidentira uz kontakt, ali se adresa ne upisuje u njegov
+                    karton.
+                  </p>
+                )}
+              </div>
+
+              {context.templates.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="email-to">Prima</Label>
-                  <Input
-                    id="email-to"
-                    value={context.contact.email}
-                    readOnly
-                    className="text-muted-foreground"
+                  <Label htmlFor="email-template">Šablon</Label>
+                  <Select value={templateId} onValueChange={handleTemplate}>
+                    <SelectTrigger id="email-template" className="w-full">
+                      <SelectValue placeholder="Bez šablona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TEMPLATE}>Bez šablona</SelectItem>
+                      {context.templates.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {context.ccOptions.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <RecipientPicker
+                    title="CC"
+                    options={context.ccOptions}
+                    selected={cc}
+                    onToggle={(id) => setCc((prev) => toggle(prev, id))}
+                  />
+                  <RecipientPicker
+                    title="BCC"
+                    options={context.ccOptions}
+                    selected={bcc}
+                    onToggle={(id) => setBcc((prev) => toggle(prev, id))}
                   />
                 </div>
+              )}
 
-                {context.templates.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="email-template">Šablon</Label>
-                    <Select value={templateId} onValueChange={handleTemplate}>
-                      <SelectTrigger id="email-template" className="w-full">
-                        <SelectValue placeholder="Bez šablona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_TEMPLATE}>Bez šablona</SelectItem>
-                        {context.templates.map((t) => (
-                          <SelectItem key={t.id} value={String(t.id)}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="email-subject">Naslov</Label>
+                <Input
+                  id="email-subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Naslov mejla"
+                />
+              </div>
 
-                {context.ccOptions.length > 0 && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <RecipientPicker
-                      title="CC"
-                      options={context.ccOptions}
-                      selected={cc}
-                      onToggle={(id) => setCc((prev) => toggle(prev, id))}
-                    />
-                    <RecipientPicker
-                      title="BCC"
-                      options={context.ccOptions}
-                      selected={bcc}
-                      onToggle={(id) => setBcc((prev) => toggle(prev, id))}
-                    />
-                  </div>
-                )}
+              <div className="space-y-2">
+                <Label>Poruka</Label>
+                {/* key remountuje editor kad šablon zameni sadržaj */}
+                <RichTextEditor
+                  key={`${templateId}-${signatureLoaded}`}
+                  defaultValue={body}
+                  onChange={setBody}
+                  ariaLabel="Tekst mejla"
+                  placeholder="Tekst mejla…"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email-subject">Naslov</Label>
-                  <Input
-                    id="email-subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Naslov mejla"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Poruka</Label>
-                  {/* key remountuje editor kad šablon zameni sadržaj */}
-                  <RichTextEditor
-                    key={`${templateId}-${signatureLoaded}`}
-                    defaultValue={body}
-                    onChange={setBody}
-                    ariaLabel="Tekst mejla"
-                    placeholder="Tekst mejla…"
-                  />
-                </div>
-
-                {context.attachments.length > 0 && (
-                  <fieldset className="space-y-2">
-                    <legend className="text-sm font-medium">Prilozi</legend>
-                    {context.attachments.map((a) => (
-                      <label
-                        key={a.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <Checkbox
-                          checked={attachmentIds.includes(a.id)}
-                          onCheckedChange={() =>
-                            setAttachmentIds((prev) => toggle(prev, a.id))
-                          }
-                        />
-                        <span>{a.name}</span>
-                        <span className="text-muted-foreground">
-                          ({formatBytes(a.size_bytes)})
-                        </span>
-                      </label>
-                    ))}
-                    {tooBig && (
-                      <p className="text-sm text-destructive">
-                        Prilozi su preveliki ({formatBytes(selectedBytes)}, a
-                        najviše je {formatBytes(MAX_TOTAL_ATTACHMENT_BYTES)}).
-                      </p>
-                    )}
-                  </fieldset>
-                )}
-
+              {context.attachments.length > 0 && (
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-medium">Slanje</legend>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="email-mode"
-                      checked={mode === "now"}
-                      onChange={() => setMode("now")}
-                      className="accent-primary"
-                    />
-                    {isEdit ? "Pošalji što pre" : "Pošalji odmah"}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="email-mode"
-                      checked={mode === "later"}
-                      onChange={() => setMode("later")}
-                      className="accent-primary"
-                    />
-                    {isEdit ? "Zakaži za drugo vreme" : "Zakaži za kasnije"}
-                  </label>
-
-                  {mode === "later" && (
-                    <Input
-                      type="datetime-local"
-                      value={scheduledAt}
-                      min={toLocalInputValue(new Date())}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="mt-1"
-                    />
+                  <legend className="text-sm font-medium">Prilozi</legend>
+                  {context.attachments.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        checked={attachmentIds.includes(a.id)}
+                        onCheckedChange={() =>
+                          setAttachmentIds((prev) => toggle(prev, a.id))
+                        }
+                      />
+                      <span>{a.name}</span>
+                      <span className="text-muted-foreground">
+                        ({formatBytes(a.size_bytes)})
+                      </span>
+                    </label>
+                  ))}
+                  {tooBig && (
+                    <p className="text-sm text-destructive">
+                      Prilozi su preveliki ({formatBytes(selectedBytes)}, a
+                      najviše je {formatBytes(MAX_TOTAL_ATTACHMENT_BYTES)}).
+                    </p>
                   )}
                 </fieldset>
+              )}
 
-                <p className="text-xs text-muted-foreground">
-                  Mejl se šalje kao{" "}
-                  {context.sender.full_name
-                    ? `${context.sender.full_name} <${context.gmailEmail}>`
-                    : context.gmailEmail}{" "}
-                  i automatski se evidentira kao kontaktiranje.
-                </p>
-              </div>
-            )}
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Slanje</legend>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="email-mode"
+                    checked={mode === "now"}
+                    onChange={() => setMode("now")}
+                    className="accent-primary"
+                  />
+                  {isEdit ? "Pošalji što pre" : "Pošalji odmah"}
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="email-mode"
+                    checked={mode === "later"}
+                    onChange={() => setMode("later")}
+                    className="accent-primary"
+                  />
+                  {isEdit ? "Zakaži za drugo vreme" : "Zakaži za kasnije"}
+                </label>
+
+                {mode === "later" && (
+                  <Input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    min={toLocalInputValue(new Date())}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    className="mt-1"
+                  />
+                )}
+              </fieldset>
+
+              <p className="text-xs text-muted-foreground">
+                Mejl se šalje kao{" "}
+                {context.sender.full_name
+                  ? `${context.sender.full_name} <${context.gmailEmail}>`
+                  : context.gmailEmail}{" "}
+                i automatski se evidentira kao kontaktiranje.
+              </p>
+            </div>
 
             <DialogFooter>
               <DialogClose asChild>
@@ -390,7 +401,7 @@ export function ComposeEmailDialog({
                 disabled={
                   isPending ||
                   tooBig ||
-                  !context.contact.email ||
+                  !to.trim() ||
                   !subject.trim() ||
                   isEmptyHtml(body)
                 }
