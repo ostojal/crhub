@@ -1,10 +1,16 @@
 "use server";
 
-import { MAX_SCHEDULE_DAYS, MAX_TOTAL_ATTACHMENT_BYTES } from "@/lib/constants";
+import {
+  MAX_BODY_CHARS,
+  MAX_SCHEDULE_DAYS,
+  MAX_SIGNATURE_CHARS,
+  MAX_TOTAL_ATTACHMENT_BYTES,
+} from "@/lib/constants";
 import { checkRole, type CurrentUser } from "@/lib/dal";
 import type { Database } from "@/lib/database.types";
 import { decryptSecret } from "@/lib/email/crypto";
 import { revokeRefreshToken } from "@/lib/email/google";
+import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
 import { claimEmail, sendClaimedEmail } from "@/lib/email/send";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
@@ -61,6 +67,9 @@ export type ComposeContext =
       ok: true;
       gmail: "connected" | "none" | "broken";
       gmailEmail: string | null;
+      // Podaci pošiljaoca za placeholdere {{moje_ime}} i slično
+      sender: { full_name: string | null; email: string };
+      signature: string | null;
       contact: ComposeContact;
       templates: { id: number; name: string; subject: string; body: string }[];
       ccOptions: { id: number; email: string; label: string | null }[];
@@ -81,7 +90,7 @@ export async function getComposeContext(
     return { ok: false, error: NO_PERMISSION };
   }
 
-  const [contactRes, tokenRes, templatesRes, ccRes, attachmentsRes] =
+  const [contactRes, tokenRes, meRes, templatesRes, ccRes, attachmentsRes] =
     await Promise.all([
       supabase
         .from("contacts")
@@ -92,6 +101,11 @@ export async function getComposeContext(
         .from("google_tokens")
         .select("google_email, status")
         .eq("user_id", me.id)
+        .maybeSingle(),
+      supabase
+        .from("users")
+        .select("email_signature")
+        .eq("id", me.id)
         .maybeSingle(),
       supabase
         .from("email_templates")
@@ -117,6 +131,8 @@ export async function getComposeContext(
         ? "broken"
         : "connected",
     gmailEmail: tokenRes.data?.google_email ?? null,
+    sender: { full_name: me.fullName, email: me.email },
+    signature: meRes.data?.email_signature ?? null,
     contact: contactRes.data,
     templates: templatesRes.data ?? [],
     ccOptions: ccRes.data ?? [],
@@ -158,13 +174,22 @@ async function resolveRecipients(
   return data.map((row) => row.email);
 }
 
-export async function composeEmail(
-  input: ComposeEmailInput,
-): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+type ParsedEmail =
+  | {
+      ok: true;
+      subject: string;
+      body: string;
+      cc: string[];
+      bcc: string[];
+      scheduledAt: string | null;
+    }
+  | { ok: false; error: string };
 
-  if (!isId(input.contactId)) return { ok: false, error: "Nepoznat kontakt." };
+// Zajedničke provere sadržaja za slanje i za izmenu zakazanog mejla
+async function parseEmailContent(
+  supabase: Client,
+  input: Omit<ComposeEmailInput, "contactId">,
+): Promise<ParsedEmail> {
   if (
     !isIdList(input.cc, MAX_RECIPIENTS) ||
     !isIdList(input.bcc, MAX_RECIPIENTS)
@@ -176,9 +201,19 @@ export async function composeEmail(
   }
 
   const subject = cleanText(input.subject, 300);
-  const body = cleanText(input.body, 10000);
   if (!subject) return { ok: false, error: "Naslov je obavezan." };
-  if (!body) return { ok: false, error: "Telo mejla je obavezno." };
+
+  // Telo je HTML iz editora — ne skraćuje se (presečen tag bi pokvario
+  // poruku), nego se prevelik mejl odbija
+  if ((input.body ?? "").length > MAX_BODY_CHARS) {
+    return {
+      ok: false,
+      error: "Mejl je prevelik. Smanji ili izbaci neku od slika u tekstu.",
+    };
+  }
+
+  const body = sanitizeEmailHtml(input.body ?? "");
+  if (isEmptyHtml(body)) return { ok: false, error: "Telo mejla je obavezno." };
 
   let scheduledAt: string | null = null;
   if (input.scheduledAt) {
@@ -197,21 +232,6 @@ export async function composeEmail(
       };
     }
     scheduledAt = when.toISOString();
-  }
-
-  const supabase = createClient();
-  if (!(await hasContactAccess(supabase, me, input.contactId))) {
-    return { ok: false, error: NO_PERMISSION };
-  }
-
-  const { data: contact } = await supabase
-    .from("contacts")
-    .select("email")
-    .eq("id", input.contactId)
-    .maybeSingle();
-
-  if (!contact?.email) {
-    return { ok: false, error: "Kontakt nema email adresu." };
   }
 
   const [cc, bcc] = await Promise.all([
@@ -243,6 +263,37 @@ export async function composeEmail(
         error: `Prilozi su preveliki (najviše ${Math.round(MAX_TOTAL_ATTACHMENT_BYTES / 1024 / 1024)} MB ukupno).`,
       };
     }
+  }
+
+  return { ok: true, subject, body, cc, bcc, scheduledAt };
+}
+
+export async function composeEmail(
+  input: ComposeEmailInput,
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (!isId(input.contactId)) return { ok: false, error: "Nepoznat kontakt." };
+
+  const supabase = createClient();
+  if (!(await hasContactAccess(supabase, me, input.contactId))) {
+    return { ok: false, error: NO_PERMISSION };
+  }
+
+  const parsed = await parseEmailContent(supabase, input);
+  if (!parsed.ok) return parsed;
+
+  const { subject, body, cc, bcc, scheduledAt } = parsed;
+
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("email")
+    .eq("id", input.contactId)
+    .maybeSingle();
+
+  if (!contact?.email) {
+    return { ok: false, error: "Kontakt nema email adresu." };
   }
 
   const { data: created, error } = await supabase
@@ -292,6 +343,148 @@ export async function composeEmail(
   return { ok: true, message: "Mejl je poslat i evidentiran." };
 }
 
+export type EmailDetails =
+  | {
+      ok: true;
+      email: {
+        id: number;
+        contactId: number | null;
+        contactName: string | null;
+        toEmail: string;
+        cc: string[];
+        bcc: string[];
+        subject: string;
+        body: string;
+        status: string;
+        scheduledAt: string;
+        sentAt: string | null;
+        error: string | null;
+        attachments: { id: number; name: string; size_bytes: number }[];
+        // Za ponovno popunjavanje kompozera pri izmeni zakazanog mejla
+        ccIds: number[];
+        bccIds: number[];
+        attachmentIds: number[];
+      };
+    }
+  | { ok: false; error: string };
+
+// Pun sadržaj jednog mejla — za pregled poslatog i za izmenu zakazanog
+export async function getEmailDetails(emailId: number): Promise<EmailDetails> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+  if (!isId(emailId)) return { ok: false, error: "Nepoznat mejl." };
+
+  const supabase = createClient();
+
+  const { data: email } = await supabase
+    .from("emails")
+    .select(
+      "id, user_id, contact_id, to_email, cc, bcc, subject, body, status, scheduled_at, sent_at, error, attachment_ids, contacts(first_name, last_name)",
+    )
+    .eq("id", emailId)
+    .maybeSingle();
+
+  if (!email) return { ok: false, error: "Mejl ne postoji." };
+  if (me.role !== "admin" && email.user_id !== me.id) {
+    return { ok: false, error: NO_PERMISSION };
+  }
+
+  const [{ data: options }, { data: attachments }] = await Promise.all([
+    supabase.from("cc_bcc_options").select("id, email"),
+    email.attachment_ids.length > 0
+      ? supabase
+          .from("attachment_templates")
+          .select("id, name, size_bytes")
+          .in("id", email.attachment_ids)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+
+  // Adrese su snimljene kao tekst; za kompozer se vraćaju na id-jeve, a one
+  // koje su u međuvremenu uklonjene sa liste jednostavno otpadaju
+  const idsFor = (addresses: string[]) =>
+    (options ?? [])
+      .filter((option) => addresses.includes(option.email))
+      .map((option) => option.id);
+
+  return {
+    ok: true,
+    email: {
+      id: email.id,
+      contactId: email.contact_id,
+      contactName:
+        [email.contacts?.first_name, email.contacts?.last_name]
+          .filter(Boolean)
+          .join(" ") || null,
+      toEmail: email.to_email,
+      cc: email.cc,
+      bcc: email.bcc,
+      subject: email.subject,
+      body: email.body,
+      status: email.status,
+      scheduledAt: email.scheduled_at,
+      sentAt: email.sent_at,
+      error: email.error,
+      attachments: attachments ?? [],
+      ccIds: idsFor(email.cc),
+      bccIds: idsFor(email.bcc),
+      attachmentIds: email.attachment_ids,
+    },
+  };
+}
+
+// Izmena mejla koji još čeka slanje. Uslovni UPDATE po statusu znači da
+// izmena ne može da "stigne" mejl koji je cron već preuzeo.
+export async function updateScheduledEmail(
+  emailId: number,
+  input: Omit<ComposeEmailInput, "contactId">,
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+  if (!isId(emailId)) return { ok: false, error: "Nepoznat mejl." };
+
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("emails")
+    .select("id, user_id, contact_id, status")
+    .eq("id", emailId)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Mejl ne postoji." };
+  if (me.role !== "admin" && existing.user_id !== me.id) {
+    return { ok: false, error: NO_PERMISSION };
+  }
+  if (existing.status !== "scheduled") {
+    return {
+      ok: false,
+      error: "Mejl više nije zakazan, pa se ne može menjati.",
+    };
+  }
+
+  const parsed = await parseEmailContent(supabase, input);
+  if (!parsed.ok) return parsed;
+
+  const { error } = await supabase
+    .from("emails")
+    .update({
+      subject: parsed.subject,
+      body: parsed.body,
+      cc: parsed.cc,
+      bcc: parsed.bcc,
+      attachment_ids: input.attachmentIds,
+      ...(parsed.scheduledAt && { scheduled_at: parsed.scheduledAt }),
+    })
+    .eq("id", emailId)
+    .eq("status", "scheduled");
+
+  if (error) return { ok: false, error: "Greška pri izmeni mejla." };
+
+  revalidatePath("/mejlovi");
+  if (existing.contact_id) revalidatePath(`/contacts/${existing.contact_id}`);
+
+  return { ok: true, message: "Zakazani mejl je izmenjen." };
+}
+
 export async function cancelScheduledEmail(
   emailId: number,
 ): Promise<ActionResult> {
@@ -322,6 +515,34 @@ export async function cancelScheduledEmail(
   if (data[0].contact_id) revalidatePath(`/contacts/${data[0].contact_id}`);
 
   return { ok: true, message: "Zakazani mejl je otkazan." };
+}
+
+// Potpis se u kompozeru dodaje na kraj poruke, pa korisnik pre slanja vidi
+// tačno ono što primalac dobija (i može da ga izmeni za taj mejl)
+export async function updateEmailSignature(
+  signature: string,
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if ((signature ?? "").length > MAX_SIGNATURE_CHARS) {
+    return { ok: false, error: "Potpis je prevelik." };
+  }
+
+  // Potpis je HTML; prazan potpis briše postojeći
+  const clean = sanitizeEmailHtml(signature ?? "");
+  const value = isEmptyHtml(clean) ? null : clean;
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ email_signature: value })
+    .eq("id", me.id);
+
+  if (error) return { ok: false, error: "Greška pri čuvanju potpisa." };
+
+  revalidatePath("/mejlovi");
+  return { ok: true, message: "Potpis je sačuvan." };
 }
 
 export async function disconnectGmail(): Promise<ActionResult> {

@@ -17,6 +17,23 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const PENDING_ROLE_LABEL = "Na čekanju";
 
+// Kategorije partnera (db/contacts-categories.sql); NULL = bez kategorije
+export const CONTACT_CATEGORIES = [
+  "finansijski",
+  "naturalni",
+  "nagradni",
+] as const;
+
+export type ContactCategory = (typeof CONTACT_CATEGORIES)[number];
+
+export const CONTACT_CATEGORY_LABELS: Record<ContactCategory, string> = {
+  finansijski: "Finansijski",
+  naturalni: "Naturalni",
+  nagradni: "Nagradni",
+};
+
+export const NO_CATEGORY_LABEL = "Bez kategorije";
+
 export const INTERACTION_TYPES = ["email", "poziv", "linkedin"] as const;
 
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
@@ -63,14 +80,22 @@ export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
   cancelled: "Otkazan",
 };
 
-// Granica po fajlu prati Vercel limit tela requesta (4.5MB), pa je bucket
-// ograničen na istu vrednost u db/emails.sql
-export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+// Fajl ide iz pretraživača pravo u Supabase Storage (potpisani upload), pa
+// Vercelov limit tela requesta od 4.5MB nije prepreka; ista vrednost stoji
+// kao file_size_limit na bucketu
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-// Gmail podnosi i mnogo više, ali veliki prilozi često padaju kod primaoca
-export const MAX_TOTAL_ATTACHMENT_BYTES = 12 * 1024 * 1024;
+// Base64 kodiranje uveća prilog za oko trećinu, a Gmail odbija poruke preko
+// 25MB — 15MB sirovih priloga daje oko 20MB poruke
+export const MAX_TOTAL_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 
 export const ATTACHMENTS_BUCKET = "email-attachments";
+
+// Slike nalepljene u telo mejla putuju kao data: URL kroz server akciju, a
+// Vercel odbija telo requesta preko 4.5MB — otud ovako postavljene granice
+export const MAX_INLINE_IMAGE_BYTES = 1024 * 1024;
+export const MAX_BODY_CHARS = 2_000_000;
+export const MAX_SIGNATURE_CHARS = 200_000;
 
 // Koliko unapred sme da se zakaže slanje
 export const MAX_SCHEDULE_DAYS = 60;

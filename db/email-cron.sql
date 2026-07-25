@@ -22,9 +22,9 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := 'YOUR_APP_URL/api/emails/process',
+    url := 'https://cr.fondigital.org/api/emails/process',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer YOUR_CRON_SECRET',
+      'Authorization', 'Bearer eeea8239ca2d29b69270feb552ecf27df1cc73e561034c908dd8ba031d17d1f6',
       'Content-Type', 'application/json'
     ),
     body := '{}'::jsonb,

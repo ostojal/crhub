@@ -11,13 +11,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cancelScheduledEmail } from "@/lib/actions/emails";
+import { ComposeEmailDialog } from "@/components/email/compose-email-dialog";
+import { EmailPreviewDialog } from "@/components/email/email-preview-dialog";
+import {
+  cancelScheduledEmail,
+  getEmailDetails,
+  type EmailDetails,
+} from "@/lib/actions/emails";
 import { EMAIL_STATUS_LABELS, type EmailStatus } from "@/lib/constants";
 import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
+
+type LoadedEmail = Extract<EmailDetails, { ok: true }>["email"];
 
 export type EmailListItem = {
   id: number;
@@ -50,6 +58,23 @@ function whenLabel(email: EmailListItem): string {
 export function EmailsList({ emails }: { emails: EmailListItem[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [preview, setPreview] = useState<LoadedEmail | null>(null);
+  const [draft, setDraft] = useState<LoadedEmail | null>(null);
+
+  // Pun sadržaj se učitava tek na klik — lista ga ne nosi sa sobom
+  const open = (emailId: number, target: "preview" | "edit") => {
+    startTransition(async () => {
+      const result = await getEmailDetails(emailId);
+
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (target === "edit") setDraft(result.email);
+      else setPreview(result.email);
+    });
+  };
 
   const handleCancel = (emailId: number) => {
     startTransition(async () => {
@@ -108,17 +133,39 @@ export function EmailsList({ emails }: { emails: EmailListItem[] }) {
               <p className="text-xs text-destructive">{email.error}</p>
             )}
 
-            {email.status === "scheduled" && (
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full"
+                className="flex-1"
                 disabled={isPending}
-                onClick={() => handleCancel(email.id)}
+                onClick={() => open(email.id, "preview")}
               >
-                Otkaži
+                Prikaži
               </Button>
-            )}
+              {email.status === "scheduled" && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled={isPending}
+                    onClick={() => open(email.id, "edit")}
+                  >
+                    Izmeni
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled={isPending}
+                    onClick={() => handleCancel(email.id)}
+                  >
+                    Otkaži
+                  </Button>
+                </>
+              )}
+            </div>
           </MobileCard>
         ))}
       </div>
@@ -164,22 +211,71 @@ export function EmailsList({ emails }: { emails: EmailListItem[] }) {
                   {whenLabel(email)}
                 </TableCell>
                 <TableCell className="px-4 text-right">
-                  {email.status === "scheduled" && (
+                  <div className="flex justify-end gap-1">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       disabled={isPending}
-                      onClick={() => handleCancel(email.id)}
+                      onClick={() => open(email.id, "preview")}
                     >
-                      Otkaži
+                      Prikaži
                     </Button>
-                  )}
+                    {email.status === "scheduled" && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => open(email.id, "edit")}
+                        >
+                          Izmeni
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => handleCancel(email.id)}
+                        >
+                          Otkaži
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      {preview && (
+        <EmailPreviewDialog
+          key={preview.id}
+          email={preview}
+          onClose={() => setPreview(null)}
+        />
+      )}
+
+      {draft?.contactId && (
+        <ComposeEmailDialog
+          key={`edit-${draft.id}`}
+          contactId={draft.contactId}
+          contactName={draft.contactName ?? draft.toEmail}
+          draft={{
+            id: draft.id,
+            subject: draft.subject,
+            body: draft.body,
+            ccIds: draft.ccIds,
+            bccIds: draft.bccIds,
+            attachmentIds: draft.attachmentIds,
+            scheduledAt: draft.scheduledAt,
+          }}
+          onClose={() => {
+            setDraft(null);
+            router.refresh();
+          }}
+        />
+      )}
     </>
   );
 }

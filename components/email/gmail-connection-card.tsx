@@ -18,6 +18,22 @@ const CALLBACK_MESSAGES: Record<
     kind: "error",
     text: "Izabrani Google nalog nije isti kao nalog kojim si prijavljen u aplikaciju.",
   },
+  denied: {
+    kind: "error",
+    text: "Pristup Gmail nalogu nije odobren na Google ekranu.",
+  },
+  state: {
+    kind: "error",
+    text: "Povezivanje je predugo trajalo ili je prekinuto. Pokušaj ponovo.",
+  },
+  google: {
+    kind: "error",
+    text: "Google nije izdao dozvolu za slanje. Proveri da je pri odobravanju čekirano slanje mejlova, pa pokušaj ponovo.",
+  },
+  db: {
+    kind: "error",
+    text: "Veza je odobrena, ali nije sačuvana jer baza nije spremna. Javi administratoru.",
+  },
   error: {
     kind: "error",
     text: "Povezivanje Gmail naloga nije uspelo. Pokušaj ponovo.",

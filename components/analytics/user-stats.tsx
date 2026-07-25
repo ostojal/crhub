@@ -1,10 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CountItem, UserStats } from "@/lib/analytics";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -41,6 +36,10 @@ export function UserStatsView({ stats }: { stats: UserStats }) {
         <BarListCard
           title="Statusi dodeljenih kontakata"
           items={stats.byStatus}
+        />
+        <BarListCard
+          title="Poslati mejlovi po kategoriji"
+          items={stats.byCategory}
         />
       </div>
 

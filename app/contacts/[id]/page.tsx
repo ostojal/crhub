@@ -4,12 +4,7 @@ import { ContactButtons } from "@/components/email/contact-buttons";
 import { InteractionsList } from "@/components/interactions/interactions-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireContactAccess } from "@/lib/dal";
 import { formatPhoneNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -136,6 +131,7 @@ export default async function ContactDetailPage({
                 phone: contact.phone,
                 mobile_phone: contact.mobile_phone,
                 city: contact.city,
+                category: contact.category,
                 notes: contact.notes,
               }}
               contactName={name}

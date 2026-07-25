@@ -20,14 +20,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   composeEmail,
   getComposeContext,
+  updateScheduledEmail,
   type ComposeContext,
 } from "@/lib/actions/emails";
 import { MAX_TOTAL_ATTACHMENT_BYTES } from "@/lib/constants";
-import { applyPlaceholders } from "@/lib/email/placeholders";
+import { isEmptyHtml, looksLikeHtml, textToHtml } from "@/lib/email/html";
+import {
+  applyPlaceholders,
+  type PlaceholderContact,
+  type PlaceholderSender,
+} from "@/lib/email/placeholders";
 import { formatBytes } from "@/lib/format";
 import { MailIcon } from "lucide-react";
 import Link from "next/link";
@@ -47,40 +53,84 @@ function toggle(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
 }
 
+// Potpis ide na dno poruke, odvojen praznim redom (kao u Gmailu)
+function signatureBlock(
+  signature: string | null,
+  contact: PlaceholderContact,
+  sender: PlaceholderSender,
+): string {
+  if (!signature) return "";
+
+  const filled = applyPlaceholders(signature, contact, sender);
+  return `<br><br>${looksLikeHtml(filled) ? filled : textToHtml(filled)}`;
+}
+
+// Zakazani mejl koji se menja umesto da se pravi novi
+export type EmailDraft = {
+  id: number;
+  subject: string;
+  body: string;
+  ccIds: number[];
+  bccIds: number[];
+  attachmentIds: number[];
+  scheduledAt: string;
+};
+
 // Renderuje se uslovno (kad je otvoren) da stanje uvek krene sveže
 export function ComposeEmailDialog({
   contactId,
   contactName,
+  draft,
   onClose,
 }: {
   contactId: number;
   contactName: string;
+  draft?: EmailDraft | null;
   onClose: () => void;
 }) {
+  const isEdit = !!draft;
+
   const [context, setContext] = useState<ComposeContext | null>(null);
   const [templateId, setTemplateId] = useState(NO_TEMPLATE);
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const [cc, setCc] = useState<number[]>([]);
-  const [bcc, setBcc] = useState<number[]>([]);
-  const [attachmentIds, setAttachmentIds] = useState<number[]>([]);
-  const [mode, setMode] = useState<"now" | "later">("now");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [subject, setSubject] = useState(draft?.subject ?? "");
+  const [body, setBody] = useState(draft?.body ?? "");
+  // Menja se kad potpis stigne sa servera, da se editor remountuje sa njim
+  const [signatureLoaded, setSignatureLoaded] = useState(false);
+  const [cc, setCc] = useState<number[]>(draft?.ccIds ?? []);
+  const [bcc, setBcc] = useState<number[]>(draft?.bccIds ?? []);
+  const [attachmentIds, setAttachmentIds] = useState<number[]>(
+    draft?.attachmentIds ?? [],
+  );
+  const [mode, setMode] = useState<"now" | "later">(isEdit ? "later" : "now");
+  const [scheduledAt, setScheduledAt] = useState(
+    draft ? toLocalInputValue(new Date(draft.scheduledAt)) : "",
+  );
   const [isPending, startTransition] = useTransition();
 
-  // Šabloni, CC/BCC liste i stanje Gmail veze stižu jednim pozivom kad se
-  // dijalog otvori
+  // Šabloni, CC/BCC liste, potpis i stanje Gmail veze stižu jednim pozivom
+  // kad se dijalog otvori
   useEffect(() => {
     let cancelled = false;
 
     getComposeContext(contactId).then((result) => {
-      if (!cancelled) setContext(result);
+      if (cancelled) return;
+
+      setContext(result);
+
+      // Potpis se odmah upisuje u telo (kao u Gmailu) da korisnik vidi i
+      // može da ga izmeni pre slanja. Pri izmeni je već u tekstu.
+      if (!isEdit && result.ok && result.signature) {
+        setBody(
+          signatureBlock(result.signature, result.contact, result.sender),
+        );
+        setSignatureLoaded(true);
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [contactId]);
+  }, [contactId, isEdit]);
 
   const handleTemplate = (value: string) => {
     setTemplateId(value);
@@ -89,9 +139,15 @@ export function ComposeEmailDialog({
     const template = context.templates.find((t) => String(t.id) === value);
     if (!template) return;
 
+    const { contact, sender, signature } = context;
+
     // Placeholderi se zamenjuju odmah, a polja ostaju izmenjiva
-    setSubject(applyPlaceholders(template.subject, context.contact));
-    setBody(applyPlaceholders(template.body, context.contact));
+    setSubject(applyPlaceholders(template.subject, contact, sender));
+
+    const templateBody = applyPlaceholders(template.body, contact, sender);
+    setBody(
+      `${looksLikeHtml(templateBody) ? templateBody : textToHtml(templateBody)}${signatureBlock(signature, contact, sender)}`,
+    );
   };
 
   const selectedBytes = context?.ok
@@ -108,17 +164,26 @@ export function ComposeEmailDialog({
       return;
     }
 
+    const payload = {
+      cc,
+      bcc,
+      subject,
+      body,
+      attachmentIds,
+      // Pri izmeni „odmah" znači: pomeri termin na sad, pa ga cron pošalje u
+      // sledećem prolazu (mejl ostaje u redu, ne šalje se iz ove akcije)
+      scheduledAt:
+        mode === "later"
+          ? new Date(scheduledAt).toISOString()
+          : isEdit
+            ? new Date().toISOString()
+            : undefined,
+    };
+
     startTransition(async () => {
-      const result = await composeEmail({
-        contactId,
-        cc,
-        bcc,
-        subject,
-        body,
-        attachmentIds,
-        scheduledAt:
-          mode === "later" ? new Date(scheduledAt).toISOString() : undefined,
-      });
+      const result = draft
+        ? await updateScheduledEmail(draft.id, payload)
+        : await composeEmail({ contactId, ...payload });
 
       if (result.ok) {
         toast.success(result.message);
@@ -133,7 +198,9 @@ export function ComposeEmailDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Kontaktiraj</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Izmeni zakazani mejl" : "Kontaktiraj"}
+          </DialogTitle>
           <DialogDescription>
             Kontakt: <span className="font-medium">{contactName}</span>
           </DialogDescription>
@@ -228,13 +295,14 @@ export function ComposeEmailDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email-body">Poruka</Label>
-                  <Textarea
-                    id="email-body"
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
+                  <Label>Poruka</Label>
+                  {/* key remountuje editor kad šablon zameni sadržaj */}
+                  <RichTextEditor
+                    key={`${templateId}-${signatureLoaded}`}
+                    defaultValue={body}
+                    onChange={setBody}
+                    ariaLabel="Tekst mejla"
                     placeholder="Tekst mejla…"
-                    rows={10}
                   />
                 </div>
 
@@ -277,7 +345,7 @@ export function ComposeEmailDialog({
                       onChange={() => setMode("now")}
                       className="accent-primary"
                     />
-                    Pošalji odmah
+                    {isEdit ? "Pošalji što pre" : "Pošalji odmah"}
                   </label>
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -287,7 +355,7 @@ export function ComposeEmailDialog({
                       onChange={() => setMode("later")}
                       className="accent-primary"
                     />
-                    Zakaži za kasnije
+                    {isEdit ? "Zakaži za drugo vreme" : "Zakaži za kasnije"}
                   </label>
 
                   {mode === "later" && (
@@ -302,8 +370,11 @@ export function ComposeEmailDialog({
                 </fieldset>
 
                 <p className="text-xs text-muted-foreground">
-                  Mejl se šalje sa adrese {context.gmailEmail} i automatski se
-                  evidentira kao kontaktiranje.
+                  Mejl se šalje kao{" "}
+                  {context.sender.full_name
+                    ? `${context.sender.full_name} <${context.gmailEmail}>`
+                    : context.gmailEmail}{" "}
+                  i automatski se evidentira kao kontaktiranje.
                 </p>
               </div>
             )}
@@ -321,14 +392,18 @@ export function ComposeEmailDialog({
                   tooBig ||
                   !context.contact.email ||
                   !subject.trim() ||
-                  !body.trim()
+                  isEmptyHtml(body)
                 }
               >
                 {isPending
-                  ? "Slanje…"
-                  : mode === "later"
-                    ? "Zakaži"
-                    : "Pošalji"}
+                  ? isEdit
+                    ? "Čuvanje…"
+                    : "Slanje…"
+                  : isEdit
+                    ? "Sačuvaj izmene"
+                    : mode === "later"
+                      ? "Zakaži"
+                      : "Pošalji"}
               </Button>
             </DialogFooter>
           </>

@@ -21,10 +21,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { unassignContact } from "@/lib/actions/assignments";
-import {
-  deleteContact,
-  getContactDeleteImpact,
-} from "@/lib/actions/contacts";
+import { deleteContact, getContactDeleteImpact } from "@/lib/actions/contacts";
 import {
   AlertDialog,
   AlertDialogAction,

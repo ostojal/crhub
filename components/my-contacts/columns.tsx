@@ -20,6 +20,7 @@ export type MyContact = {
   phone: string | null;
   mobile_phone: string | null;
   city: string | null;
+  category: string | null;
   contact_status: {
     communication_status: string | null;
     interest_tag: string | null;
@@ -142,9 +143,7 @@ export function buildMyContactColumns({
             size="sm"
             onClick={() => onCompose(row.original)}
             disabled={!row.original.email}
-            title={
-              row.original.email ? undefined : "Kontakt nema email adresu"
-            }
+            title={row.original.email ? undefined : "Kontakt nema email adresu"}
           >
             <MailIcon data-icon="inline-start" />
             Kontaktiraj

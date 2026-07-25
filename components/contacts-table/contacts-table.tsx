@@ -33,7 +33,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Role } from "@/lib/constants";
+import {
+  CONTACT_CATEGORIES,
+  CONTACT_CATEGORY_LABELS,
+  NO_CATEGORY_LABEL,
+  type Role,
+} from "@/lib/constants";
 import { formatPhoneNumber } from "@/lib/format";
 import { format } from "date-fns";
 import {
@@ -75,6 +80,16 @@ import {
 import { ContactActions, type ContactActionHandlers } from "./contact-actions";
 import { ContactBulkActions } from "./contact-bulk-actions";
 
+// Prazna vrednost = svi kontakti; "bez" = kontakti bez kategorije
+const CATEGORY_FILTERS = [
+  { value: "", label: "Svi" },
+  ...CONTACT_CATEGORIES.map((value) => ({
+    value,
+    label: CONTACT_CATEGORY_LABELS[value],
+  })),
+  { value: "bez", label: NO_CATEGORY_LABEL },
+];
+
 type ContactsTableProps = {
   contacts: ContactRow[];
   contactsCount: number;
@@ -93,6 +108,7 @@ function toEditable(contact: ContactRow): ContactEditable {
     phone: contact.phone ?? null,
     mobile_phone: contact.mobile_phone ?? null,
     city: contact.city ?? null,
+    category: contact.category ?? null,
     notes: contact.notes ?? null,
   };
 }
@@ -171,7 +187,10 @@ function ContactMobileCard({
           <MobileField label="Mobilni">
             <span className="inline-flex items-center gap-1">
               {formatPhoneNumber(contact.mobile_phone)}
-              <CopyButton value={contact.mobile_phone} label="Mobilni telefon" />
+              <CopyButton
+                value={contact.mobile_phone}
+                label="Mobilni telefon"
+              />
             </span>
           </MobileField>
         )}
@@ -380,8 +399,33 @@ export function ContactsTable({
     },
   });
 
+  const activeCategory = searchParams.get("category") ?? "";
+
+  const setCategory = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+
+    if (value) params.set("category", value);
+    else params.delete("category");
+
+    params.delete("page");
+    router.push(`?${params.toString()}`);
+  };
+
   return (
     <div className="space-y-1 overflow-hidden">
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {CATEGORY_FILTERS.map((filter) => (
+          <Button
+            key={filter.value || "all"}
+            size="sm"
+            variant={activeCategory === filter.value ? "default" : "outline"}
+            onClick={() => setCategory(filter.value)}
+          >
+            {filter.label}
+          </Button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2">
         <div className="relative w-full max-w-sm">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -432,7 +476,7 @@ export function ContactsTable({
         )}
       </div>
 
-      <div className="mt-2 flex items-end justify-between min-h-8">
+      <div className="mt-2 flex min-h-8 items-end justify-between">
         <p className="text-end text-sm text-muted-foreground">
           Prikazano {table.getRowModel().rows.length} od {contactsCount} redova
           {table.getFilteredSelectedRowModel().rows.length > 0 &&
@@ -446,9 +490,7 @@ export function ContactsTable({
               .getFilteredSelectedRowModel()
               .rows.map((x) => x.original)}
             viewer={viewer}
-            onAssign={(contacts) =>
-              setAssignTarget({ kind: "bulk", contacts })
-            }
+            onAssign={(contacts) => setAssignTarget({ kind: "bulk", contacts })}
             onDone={() => table.resetRowSelection()}
           />
         )}
@@ -499,8 +541,10 @@ export function ContactsTable({
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
               >
+                {/* Bez `capitalize`: vrednosti se prikazuju tačno onako kako
+                    su unete u bazu */}
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="px-4 capitalize">
+                  <TableCell key={cell.id} className="px-4">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

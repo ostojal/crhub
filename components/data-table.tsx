@@ -56,6 +56,8 @@ type DataTableProps<TData> = {
   toolbar?: (table: TanstackTable<TData>) => React.ReactNode;
   // Kad je zadato, na mobilnom se umesto tabele prikazuje lista kartica
   renderMobileCard?: (row: Row<TData>) => React.ReactNode;
+  // Za liste koje se učitavaju u celini (npr. moji kontakti)
+  hidePagination?: boolean;
 };
 
 // Prazna vrednost u ćeliji — koristi se u definicijama kolona umesto ranijeg
@@ -76,6 +78,7 @@ export function DataTable<TData>({
   enableRowSelection = false,
   toolbar,
   renderMobileCard,
+  hidePagination = false,
 }: DataTableProps<TData>) {
   const router = useRouter();
 
@@ -181,9 +184,11 @@ export function DataTable<TData>({
       {renderMobileCard && (
         <div className="space-y-3 md:hidden">
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <div key={row.id}>{renderMobileCard(row)}</div>
-            ))
+            table
+              .getRowModel()
+              .rows.map((row) => (
+                <div key={row.id}>{renderMobileCard(row)}</div>
+              ))
           ) : (
             <div className="rounded-md border p-6 text-center text-sm text-muted-foreground">
               Nema rezultata.
@@ -248,7 +253,8 @@ export function DataTable<TData>({
         </Table>
       </div>
 
-      <Pagination className="my-4">
+      {!hidePagination && (
+        <Pagination className="my-4">
           <PaginationContent>
             {table.getState().pagination.pageIndex >= 1 && (
               <PaginationItem>
@@ -312,6 +318,7 @@ export function DataTable<TData>({
             )}
           </PaginationContent>
         </Pagination>
+      )}
     </div>
   );
 }

@@ -3,38 +3,25 @@ import { MyContactsView } from "@/components/my-contacts/my-contacts-view";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 
-const PAGE_SIZE = 25;
+// Korisnik ima desetine, ne hiljade dodeljenih kontakata, pa se učitavaju svi
+// odjednom — tek tako već kontaktirani mogu da odu na dno cele liste, a ne
+// samo unutar tekuće strane
+const MAX_CONTACTS = 500;
 
-export default async function MyContactsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: number }>;
-}) {
+export default async function MyContactsPage() {
   const me = await requireRole("user");
-
-  const { page } = await searchParams;
-  const from = ((page ?? 1) - 1) * PAGE_SIZE;
 
   const supabase = createClient();
 
-  // Upit i prebrojavanje idu paralelno — jedno kruženje do baze umesto dva
-  const [{ data: assignments, error }, { count }] = await Promise.all([
-    supabase
-      .from("assignments")
-      .select(
-        "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at))",
-      )
-      .eq("user_id", me.id)
-      .order("assigned_at", { ascending: false })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE_SIZE - 1),
-    supabase
-      .from("assignments")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", me.id),
-  ]);
-
-  const pagesCount = Math.ceil((count ?? 0) / PAGE_SIZE);
+  const { data: assignments, error } = await supabase
+    .from("assignments")
+    .select(
+      "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, category, contact_status(communication_status, interest_tag, updated_at))",
+    )
+    .eq("user_id", me.id)
+    .order("assigned_at", { ascending: false })
+    .order("id", { ascending: true })
+    .limit(MAX_CONTACTS);
 
   if (error) {
     return (
@@ -57,11 +44,11 @@ export default async function MyContactsPage({
         Moji kontakti
       </h1>
       <p className="mb-6 text-sm text-foreground/60">
-        Kontakti koji su ti dodeljeni. Klikni na ime za detalje i istoriju,
-        ili odmah evidentiraj kontaktiranje.
+        Kontakti koji su ti dodeljeni. Klikni na ime za detalje i istoriju, ili
+        odmah pošalji mejl.
       </p>
 
-      <MyContactsView contacts={contacts} pagesCount={pagesCount} />
+      <MyContactsView contacts={contacts} />
     </div>
   );
 }

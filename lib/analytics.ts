@@ -2,8 +2,11 @@ import "server-only";
 
 import {
   COMMUNICATION_STATUSES,
+  CONTACT_CATEGORIES,
+  CONTACT_CATEGORY_LABELS,
   INTERACTION_TYPE_LABELS,
   INTERACTION_TYPES,
+  NO_CATEGORY_LABEL,
 } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { isOneOf } from "@/lib/validate";
@@ -34,8 +37,49 @@ export type UserStats = {
   last30Days: number;
   byType: CountItem[];
   byStatus: CountItem[];
+  byCategory: CountItem[];
   recent: RecentInteraction[];
 };
+
+// Poslati mejlovi razvrstani po kategoriji partnera kome su poslati.
+// userId izostavljen = ceo tim.
+export async function getSentByCategory(userId?: number): Promise<CountItem[]> {
+  const supabase = createClient();
+
+  const query = supabase
+    .from("emails")
+    .select("contacts(category)")
+    .eq("status", "sent")
+    .limit(ROW_LIMIT);
+
+  if (userId !== undefined) query.eq("user_id", userId);
+
+  const { data } = await query;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const category = row.contacts?.category;
+    const label =
+      category && isOneOf(category, CONTACT_CATEGORIES)
+        ? CONTACT_CATEGORY_LABELS[category]
+        : NO_CATEGORY_LABEL;
+
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  // Fiksan redosled kategorija, "bez kategorije" na kraju i samo ako postoji
+  const items: CountItem[] = CONTACT_CATEGORIES.map((category) => ({
+    label: CONTACT_CATEGORY_LABELS[category],
+    count: counts.get(CONTACT_CATEGORY_LABELS[category]) ?? 0,
+  }));
+
+  const uncategorized = counts.get(NO_CATEGORY_LABEL) ?? 0;
+  if (uncategorized > 0) {
+    items.push({ label: NO_CATEGORY_LABEL, count: uncategorized });
+  }
+
+  return items;
+}
 
 function interactionTypeLabel(type: string | null): string {
   if (type && isOneOf(type, INTERACTION_TYPES)) {
@@ -47,7 +91,7 @@ function interactionTypeLabel(type: string | null): string {
 export async function getUserStats(userId: number): Promise<UserStats> {
   const supabase = createClient();
 
-  const [assignedRes, interactionsRes, statusRes, recentRes] =
+  const [assignedRes, interactionsRes, statusRes, recentRes, byCategory] =
     await Promise.all([
       supabase
         .from("assignments")
@@ -74,6 +118,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(8),
+      getSentByCategory(userId),
     ]);
 
   const interactions = interactionsRes.data ?? [];
@@ -138,6 +183,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     last30Days,
     byType,
     byStatus,
+    byCategory,
     recent,
   };
 }

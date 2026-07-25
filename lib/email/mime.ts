@@ -1,6 +1,12 @@
-// Gradi RFC 5322 poruku za Gmail API. Telo je uvek text/plain (kompozer je
-// obično textarea polje), prilozi idu kao multipart/mixed.
+// Gradi RFC 5322 poruku za Gmail API.
+// Struktura zavisi od sadržaja:
+//   text/plain                                   — samo tekst
+//   multipart/alternative (plain + html)         — formatiran tekst
+//   multipart/related     (alternative + slike)  — nalepljene slike (cid:)
+//   multipart/mixed       (… + prilozi)          — kad ima priloga
 // Rezultat je čist ASCII: zaglavlja su RFC 2047 kodirana, sadržaj base64.
+
+import type { InlineImage } from "./html";
 
 export type MimeAttachment = {
   filename: string;
@@ -10,13 +16,21 @@ export type MimeAttachment = {
 
 export type MimeMessage = {
   from: string;
+  // Ime koje primalac vidi umesto gole adrese
+  fromName?: string | null;
   to: string;
   cc: string[];
   bcc: string[];
   subject: string;
+  // Tekstualna verzija; jedina verzija ako bodyHtml izostane
   bodyText: string;
+  bodyHtml?: string | null;
+  inlineImages?: InlineImage[];
   attachments: MimeAttachment[];
 };
+
+// Jedan MIME deo: sopstvena zaglavlja i telo
+type Part = { headers: string[]; body: string };
 
 const CRLF = "\r\n";
 
@@ -82,13 +96,93 @@ function nameParams(filename: string, key: "name" | "filename"): string {
     : `${params}; ${key}*=UTF-8''${encodeURIComponent(clean)}`;
 }
 
+// "Ime Prezime <adresa>" — bez ovoga primalac vidi samo golu adresu.
+// Ne-ASCII ime ide kao encoded-word (i tada se ne navodi pod navodnicima).
+function formatAddress(email: string, name?: string | null): string {
+  const address = sanitizeHeader(email);
+  const display = sanitizeHeader(name ?? "");
+  if (!display) return address;
+
+  return isPrintableAscii(display)
+    ? `"${display.replace(/["\\]/g, "")}" <${address}>`
+    : `${encodeHeaderValue(display)} <${address}>`;
+}
+
 function randomBoundary(): string {
   return `crhub_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 }
 
+function renderPart(part: Part): string {
+  return [...part.headers, "", part.body].join(CRLF);
+}
+
+function multipart(subtype: string, parts: Part[], typeParams = ""): Part {
+  const boundary = randomBoundary();
+  const lines: string[] = [];
+
+  for (const part of parts) {
+    lines.push(`--${boundary}`, renderPart(part));
+  }
+  lines.push(`--${boundary}--`);
+
+  return {
+    headers: [
+      `Content-Type: multipart/${subtype}; boundary="${boundary}"${typeParams}`,
+    ],
+    body: lines.join(CRLF),
+  };
+}
+
+function textPart(text: string): Part {
+  return {
+    headers: [
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+    ],
+    body: wrapBase64(Buffer.from(text.replace(/\r?\n/g, CRLF), "utf8")),
+  };
+}
+
+function htmlPart(html: string): Part {
+  return {
+    headers: [
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+    ],
+    body: wrapBase64(Buffer.from(html, "utf8")),
+  };
+}
+
+// Slika iz tela poruke; klijent je prikazuje preko cid: reference
+function inlineImagePart(image: InlineImage): Part {
+  return {
+    headers: [
+      `Content-Type: ${sanitizeHeader(image.mimeType) || "image/png"}`,
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${sanitizeHeader(image.cid)}>`,
+      "Content-Disposition: inline",
+    ],
+    body: wrapBase64(image.content),
+  };
+}
+
+function attachmentPart(attachment: MimeAttachment): Part {
+  const mimeType =
+    sanitizeHeader(attachment.mimeType) || "application/octet-stream";
+
+  return {
+    headers: [
+      `Content-Type: ${mimeType}; ${nameParams(attachment.filename, "name")}`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; ${nameParams(attachment.filename, "filename")}`,
+    ],
+    body: wrapBase64(attachment.content),
+  };
+}
+
 export function buildMimeMessage(message: MimeMessage): string {
   const headers = [
-    `From: ${sanitizeHeader(message.from)}`,
+    `From: ${formatAddress(message.from, message.fromName)}`,
     `To: ${sanitizeHeader(message.to)}`,
   ];
 
@@ -103,49 +197,30 @@ export function buildMimeMessage(message: MimeMessage): string {
   headers.push(`Subject: ${encodeHeaderValue(message.subject)}`);
   headers.push("MIME-Version: 1.0");
 
-  const bodyText = message.bodyText.replace(/\r?\n/g, CRLF);
+  const images = message.inlineImages ?? [];
 
-  if (message.attachments.length === 0) {
-    return [
-      ...headers,
-      'Content-Type: text/plain; charset="UTF-8"',
-      "Content-Transfer-Encoding: base64",
-      "",
-      wrapBase64(Buffer.from(bodyText, "utf8")),
-      "",
-    ].join(CRLF);
-  }
+  // Tekst uz HTML: klijenti koji ne prikazuju HTML dobijaju čitljivu verziju
+  let root: Part = message.bodyHtml
+    ? multipart("alternative", [
+        textPart(message.bodyText),
+        htmlPart(message.bodyHtml),
+      ])
+    : textPart(message.bodyText);
 
-  const boundary = randomBoundary();
-  const parts = [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    wrapBase64(Buffer.from(bodyText, "utf8")),
-  ];
-
-  for (const attachment of message.attachments) {
-    const mimeType =
-      sanitizeHeader(attachment.mimeType) || "application/octet-stream";
-
-    parts.push(
-      "",
-      `--${boundary}`,
-      `Content-Type: ${mimeType}; ${nameParams(attachment.filename, "name")}`,
-      "Content-Transfer-Encoding: base64",
-      `Content-Disposition: attachment; ${nameParams(attachment.filename, "filename")}`,
-      "",
-      wrapBase64(attachment.content),
+  if (message.bodyHtml && images.length > 0) {
+    root = multipart(
+      "related",
+      [root, ...images.map(inlineImagePart)],
+      '; type="multipart/alternative"',
     );
   }
 
-  parts.push("", `--${boundary}--`, "");
+  if (message.attachments.length > 0) {
+    root = multipart("mixed", [
+      root,
+      ...message.attachments.map(attachmentPart),
+    ]);
+  }
 
-  return [
-    ...headers,
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    ...parts,
-  ].join(CRLF);
+  return [...headers, ...root.headers, "", root.body, ""].join(CRLF);
 }

@@ -12,13 +12,25 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type ContactInput,
   createContact,
   updateContact,
 } from "@/lib/actions/contacts";
-import { useTransition, type FormEvent } from "react";
+import {
+  CONTACT_CATEGORIES,
+  CONTACT_CATEGORY_LABELS,
+  NO_CATEGORY_LABEL,
+} from "@/lib/constants";
+import { useState, useTransition, type FormEvent } from "react";
 import { toast } from "sonner";
 
 export type ContactEditable = {
@@ -31,8 +43,11 @@ export type ContactEditable = {
   phone: string | null;
   mobile_phone: string | null;
   city: string | null;
+  category: string | null;
   notes: string | null;
 };
+
+const NO_CATEGORY = "none";
 
 const FIELDS: {
   name: keyof ContactInput;
@@ -58,6 +73,7 @@ export function ContactFormDialog({
   contact: ContactEditable | null;
   onClose: () => void;
 }) {
+  const [category, setCategory] = useState(contact?.category || NO_CATEGORY);
   const [isPending, startTransition] = useTransition();
   const isEdit = contact !== null;
 
@@ -72,6 +88,7 @@ export function ContactFormDialog({
       ]),
     ) as unknown as ContactInput;
     input.notes = String(formData.get("notes") ?? "");
+    input.category = category === NO_CATEGORY ? "" : category;
 
     startTransition(async () => {
       const result = isEdit
@@ -91,7 +108,9 @@ export function ContactFormDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Izmeni kontakt" : "Novi kontakt"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Izmeni kontakt" : "Novi kontakt"}
+          </DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Izmene su odmah vidljive svima koji imaju pristup kontaktu."
@@ -116,6 +135,23 @@ export function ContactFormDialog({
                 />
               </div>
             ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact-category">Kategorija partnera</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger id="contact-category" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>{NO_CATEGORY_LABEL}</SelectItem>
+                {CONTACT_CATEGORIES.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {CONTACT_CATEGORY_LABELS[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

@@ -3,10 +3,11 @@ import type {
   ContactRow,
 } from "@/components/contacts-table/columns";
 import { ContactsTable } from "@/components/contacts-table/contacts-table";
+import { CONTACT_CATEGORIES } from "@/lib/constants";
 import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
-import { escapeLike } from "@/lib/validate";
+import { escapeLike, isOneOf } from "@/lib/validate";
 
 const PAGE_SIZE = 25;
 
@@ -28,12 +29,17 @@ function editorFilterExpression(term: string): string {
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: number; sort?: string; q?: string }>;
+  searchParams: Promise<{
+    page?: number;
+    sort?: string;
+    q?: string;
+    category?: string;
+  }>;
 }) {
   const me = await requireRole("admin", "editor");
   const isAdmin = me.role === "admin";
 
-  const { page, sort, q } = await searchParams;
+  const { page, sort, q, category } = await searchParams;
 
   const supabase = createClient();
 
@@ -45,6 +51,15 @@ export default async function ContactsPage({
     count: "exact",
     head: true,
   });
+
+  // "bez" su kontakti bez kategorije; nepoznata vrednost se ignoriše
+  if (category === "bez") {
+    query.is("category", null);
+    countQuery.is("category", null);
+  } else if (category && isOneOf(category, CONTACT_CATEGORIES)) {
+    query.eq("category", category);
+    countQuery.eq("category", category);
+  }
 
   const searchTerm = q?.trim();
   const searchFilter = isAdmin ? createSearchFilter(searchTerm) : null;
@@ -97,11 +112,8 @@ export default async function ContactsPage({
     .eq("role", "user")
     .order("full_name", { ascending: true });
 
-  const [
-    { data: contacts, error },
-    { count },
-    { data: assignees },
-  ] = await Promise.all([query, countQuery, assigneesQuery]);
+  const [{ data: contacts, error }, { count }, { data: assignees }] =
+    await Promise.all([query, countQuery, assigneesQuery]);
 
   if (error) {
     return (

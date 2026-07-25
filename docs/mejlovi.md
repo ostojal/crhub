@@ -58,11 +58,13 @@ U SQL editoru pokreni redom:
 1. `db/emails.sql` — tabele (`google_tokens`, `email_templates`,
    `attachment_templates`, `cc_bcc_options`, `emails`) i privatni Storage
    bucket `email-attachments`.
-2. `db/email-cron.sql` — cron koji svakog minuta poziva aplikaciju da pošalje
+2. `db/emails-v2.sql` — potpis po korisniku (`users.email_signature`) i limit
+   priloga podignut na 10MB.
+3. `db/email-cron.sql` — cron koji svakog minuta poziva aplikaciju da pošalje
    dospele zakazane mejlove. **Pre pokretanja zameni** `YOUR_APP_URL` i
    `YOUR_CRON_SECRET` u fajlu. Pokreni tek kad je aplikacija deployovana.
 
-Obe skripte su idempotentne.
+Sve skripte su idempotentne.
 
 ## 3. Env varovi
 
@@ -81,12 +83,26 @@ nalog.
 
 ## 4. Kako se koristi
 
-- **Admin** na `/admin/mejlovi` pravi šablone (u naslovu i telu može
-  `{{ime}}`, `{{prezime}}`, `{{firma}}`, `{{pozicija}}`, `{{grad}}`), otprema
-  priloge (do 4 MB po fajlu) i dodaje CC/BCC adrese.
+- **Admin** na `/admin/mejlovi` pravi šablone, otprema priloge (do 10 MB po
+  fajlu) i dodaje CC/BCC adrese. U naslovu i telu šablona mogu da stoje
+  podaci kontakta — `{{ime}}`, `{{prezime}}`, `{{firma}}`, `{{pozicija}}`,
+  `{{grad}}` — i podaci pošiljaoca: `{{moje_ime}}`, `{{moje_prezime}}`,
+  `{{moje_ime_i_prezime}}`, `{{moj_email}}`.
 - **Svaki korisnik** na `/mejlovi` jednom klikne _Poveži Gmail_. Povezuje se
   isključivo nalog sa kojim je prijavljen u aplikaciju — drugi Google nalog
-  aplikacija odbija.
+  aplikacija odbija. Tu se podešava i **potpis**, koji se pri otvaranju
+  kompozera automatski dodaje na kraj poruke (kao potpis u Gmailu) i može se
+  izmeniti za pojedinačni mejl.
+- Mejl odlazi kao „Ime Prezime &lt;adresa&gt;" — ime se uzima sa Google naloga
+  korisnika (`users.full_name`).
+- Telo mejla, šabloni i potpis se pišu u editoru sa formatiranjem (podebljano,
+  kurziv, podvučeno, veličina fonta, liste, linkovi, slike). Slika se nalepi
+  (Ctrl+V) ili ubaci dugmetom; najviše 1 MB po slici, jer telo poruke putuje
+  kroz server akciju koju Vercel ograničava na 4.5 MB.
+- Poruka se šalje kao `multipart/alternative` (HTML + čist tekst za klijente
+  bez HTML-a); slike iz teksta postaju `cid:` delovi poruke, jer mejl klijenti
+  blokiraju `data:` slike. Stariji šabloni pisani kao čist tekst i dalje rade —
+  prelomi redova se pretvaraju u `<br>` pri otvaranju.
 - Kompozer se otvara sa **Kontaktiraj** na strani kontakta, u _Mojim
   kontaktima_ (red i mobilna kartica) i iz menija u admin tabeli kontakata.
 - Poslati i zakazani mejlovi se vide na `/mejlovi`; zakazani se mogu otkazati

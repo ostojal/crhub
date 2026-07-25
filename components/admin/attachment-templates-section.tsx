@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  createAttachmentUpload,
   deleteAttachmentTemplate,
-  uploadAttachmentTemplate,
+  saveAttachmentTemplate,
 } from "@/lib/actions/email-admin";
 import { MAX_ATTACHMENT_BYTES } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { Trash2Icon, UploadIcon } from "lucide-react";
-import { useRef, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition, type FormEvent } from "react";
 import { toast } from "sonner";
 
 export type AttachmentTemplate = {
@@ -21,21 +22,65 @@ export type AttachmentTemplate = {
   mime_type: string;
 };
 
+// Fajl ide pravo u Supabase Storage preko potpisanog URL-a, mimo servera —
+// Vercel bi odbio request veći od 4.5MB
+async function uploadToSignedUrl(uploadUrl: string, file: File) {
+  const body = new FormData();
+  body.append("cacheControl", "3600");
+  body.append("", file);
+
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    body,
+    headers: { "x-upsert": "false" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Otpremanje nije uspelo (HTTP ${response.status}).`);
+  }
+}
+
 export function AttachmentTemplatesSection({
   attachments,
 }: {
   attachments: AttachmentTemplate[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    const data = new FormData(event.currentTarget);
+    const file = data.get("file");
 
-    startTransition(async () => {
-      const result = await uploadAttachmentTemplate(data);
+    if (!(file instanceof File) || file.size === 0) {
+      toast.error("Izaberi fajl.");
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error(
+        `Fajl je prevelik (najviše ${formatBytes(MAX_ATTACHMENT_BYTES)}).`,
+      );
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const upload = await createAttachmentUpload(file.name, file.size);
+      if (!upload.ok) {
+        toast.error(upload.error);
+        return;
+      }
+
+      await uploadToSignedUrl(upload.uploadUrl, file);
+
+      const result = await saveAttachmentTemplate({
+        name: String(data.get("name") ?? "") || file.name,
+        storagePath: upload.storagePath,
+        mimeType: file.type,
+      });
 
       if (result.ok) {
         toast.success(result.message);
@@ -43,7 +88,13 @@ export function AttachmentTemplatesSection({
       } else {
         toast.error(result.error);
       }
-    });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Otpremanje nije uspelo.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDelete = (id: number) => {
@@ -79,9 +130,9 @@ export function AttachmentTemplatesSection({
           </div>
 
           <div className="flex items-center gap-3">
-            <Button type="submit" size="sm" disabled={isPending}>
+            <Button type="submit" size="sm" disabled={isUploading || isPending}>
               <UploadIcon data-icon="inline-start" />
-              {isPending ? "Otpremanje…" : "Dodaj prilog"}
+              {isUploading ? "Otpremanje…" : "Dodaj prilog"}
             </Button>
             <span className="text-xs text-muted-foreground">
               Najviše {formatBytes(MAX_ATTACHMENT_BYTES)} po fajlu.

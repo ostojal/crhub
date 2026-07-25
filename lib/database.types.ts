@@ -35,6 +35,7 @@ export interface Database {
           email: string | null;
           full_name: string | null;
           role: string | null;
+          email_signature: string | null;
           created_at: string;
         };
         Insert: {
@@ -42,6 +43,7 @@ export interface Database {
           email?: string | null;
           full_name?: string | null;
           role?: string | null;
+          email_signature?: string | null;
           created_at?: string;
         };
         Update: {
@@ -49,6 +51,7 @@ export interface Database {
           email?: string | null;
           full_name?: string | null;
           role?: string | null;
+          email_signature?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -64,6 +67,7 @@ export interface Database {
           phone: string | null;
           mobile_phone: string | null;
           city: string | null;
+          category: string | null;
           notes: string | null;
           created_at: string;
         };
@@ -77,6 +81,7 @@ export interface Database {
           phone?: string | null;
           mobile_phone?: string | null;
           city?: string | null;
+          category?: string | null;
           notes?: string | null;
           created_at?: string;
         };
@@ -90,6 +95,7 @@ export interface Database {
           phone?: string | null;
           mobile_phone?: string | null;
           city?: string | null;
+          category?: string | null;
           notes?: string | null;
           created_at?: string;
         };

@@ -65,9 +65,7 @@ export async function logInteractions(
       .in("contact_id", contactIds)
       .eq("user_id", me.id);
 
-    const assignedIds = new Set(
-      (assignments ?? []).map((a) => a.contact_id),
-    );
+    const assignedIds = new Set((assignments ?? []).map((a) => a.contact_id));
     if (!contactIds.every((id) => assignedIds.has(id))) {
       return { ok: false, error: NO_PERMISSION };
     }

@@ -1,5 +1,6 @@
 import { EmailsList, type EmailListItem } from "@/components/email/emails-list";
 import { GmailConnectionCard } from "@/components/email/gmail-connection-card";
+import { SignatureCard } from "@/components/email/signature-card";
 import type { EmailStatus } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -12,21 +13,27 @@ export default async function EmailsPage() {
 
   const supabase = createClient();
 
-  const [{ data: connection }, { data: emails, error }] = await Promise.all([
-    supabase
-      .from("google_tokens")
-      .select("google_email, status")
-      .eq("user_id", me.id)
-      .maybeSingle(),
-    supabase
-      .from("emails")
-      .select(
-        "id, contact_id, to_email, subject, status, scheduled_at, sent_at, error, contacts(first_name, last_name)",
-      )
-      .eq("user_id", me.id)
-      .order("created_at", { ascending: false })
-      .limit(EMAIL_LIMIT),
-  ]);
+  const [{ data: connection }, { data: profile }, { data: emails, error }] =
+    await Promise.all([
+      supabase
+        .from("google_tokens")
+        .select("google_email, status")
+        .eq("user_id", me.id)
+        .maybeSingle(),
+      supabase
+        .from("users")
+        .select("email_signature")
+        .eq("id", me.id)
+        .maybeSingle(),
+      supabase
+        .from("emails")
+        .select(
+          "id, contact_id, to_email, subject, status, scheduled_at, sent_at, error, contacts(first_name, last_name)",
+        )
+        .eq("user_id", me.id)
+        .order("created_at", { ascending: false })
+        .limit(EMAIL_LIMIT),
+    ]);
 
   const items: EmailListItem[] = (emails ?? []).map((email) => ({
     id: email.id,
@@ -58,10 +65,11 @@ export default async function EmailsPage() {
         Mejlovi koje si poslao ili zakazao iz aplikacije.
       </p>
 
-      <div className="mb-6">
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <Suspense fallback={null}>
           <GmailConnectionCard connection={connection ?? null} />
         </Suspense>
+        <SignatureCard signature={profile?.email_signature ?? null} />
       </div>
 
       {error ? (

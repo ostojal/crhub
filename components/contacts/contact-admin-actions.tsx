@@ -36,10 +36,7 @@ export function ContactAdminActions({
       </div>
 
       {dialog === "edit" && (
-        <ContactFormDialog
-          contact={contact}
-          onClose={() => setDialog(null)}
-        />
+        <ContactFormDialog contact={contact} onClose={() => setDialog(null)} />
       )}
 
       {dialog === "status" && (

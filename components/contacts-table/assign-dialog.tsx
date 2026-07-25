@@ -171,8 +171,7 @@ function AssignDialogInner({
             </Select>
             {assignees.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                Nijedan nalog nema ulogu Korisnik — dodaj je u panelu
-                Korisnici.
+                Nijedan nalog nema ulogu Korisnik — dodaj je u panelu Korisnici.
               </p>
             )}
           </div>
@@ -212,8 +211,8 @@ function AssignDialogInner({
 
           {singleContact && scope === "contact" && currentAssignee && (
             <p className="text-xs text-amber-600 dark:text-amber-500">
-              Kontakt je već dodeljen: {currentAssignee}. Dodela će ga
-              prebaciti na izabranog korisnika.
+              Kontakt je već dodeljen: {currentAssignee}. Dodela će ga prebaciti
+              na izabranog korisnika.
             </p>
           )}
           {singleContact &&
@@ -226,8 +225,8 @@ function AssignDialogInner({
             )}
           {target.kind === "bulk" && bulkAlreadyAssigned > 0 && (
             <p className="text-xs text-amber-600 dark:text-amber-500">
-              Već dodeljenih u izboru: {bulkAlreadyAssigned}. Biće prebačeni
-              na izabranog korisnika.
+              Već dodeljenih u izboru: {bulkAlreadyAssigned}. Biće prebačeni na
+              izabranog korisnika.
             </p>
           )}
         </div>

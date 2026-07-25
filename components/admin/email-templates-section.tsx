@@ -13,11 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   deleteEmailTemplate,
   saveEmailTemplate,
 } from "@/lib/actions/email-admin";
+import { isEmptyHtml } from "@/lib/email/html";
 import { PLACEHOLDER_TOKENS } from "@/lib/email/placeholders";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState, useTransition, type FormEvent } from "react";
@@ -124,6 +125,7 @@ function TemplateDialog({
   template: EmailTemplate | null;
   onClose: () => void;
 }) {
+  const [body, setBody] = useState(template?.body ?? "");
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -135,7 +137,7 @@ function TemplateDialog({
         ...(template && { id: template.id }),
         name: String(form.get("name") ?? ""),
         subject: String(form.get("subject") ?? ""),
-        body: String(form.get("body") ?? ""),
+        body,
       });
 
       if (result.ok) {
@@ -183,14 +185,13 @@ function TemplateDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="template-body">Telo mejla</Label>
-            <Textarea
-              id="template-body"
-              name="body"
-              required
-              rows={12}
-              defaultValue={template?.body}
-              placeholder={"Poštovani {{ime}},\n\n…"}
+            <Label>Telo mejla</Label>
+            <RichTextEditor
+              defaultValue={template?.body ?? ""}
+              onChange={setBody}
+              ariaLabel="Telo mejla"
+              placeholder="Poštovani {{ime}}, …"
+              minHeight="16rem"
             />
           </div>
 
@@ -200,7 +201,7 @@ function TemplateDialog({
                 Otkaži
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || isEmptyHtml(body)}>
               {isPending ? "Čuvanje…" : "Sačuvaj"}
             </Button>
           </DialogFooter>

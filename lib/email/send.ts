@@ -7,6 +7,13 @@ import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptSecret } from "./crypto";
 import { GoogleAuthError, mintAccessToken, sendGmailMessage } from "./google";
+import {
+  extractInlineImages,
+  htmlToText,
+  looksLikeHtml,
+  sanitizeEmailHtml,
+  textToHtml,
+} from "./html";
 import { buildMimeMessage, type MimeAttachment } from "./mime";
 import { applyPlaceholders } from "./placeholders";
 
@@ -102,6 +109,7 @@ async function logSentEmail(
   supabase: Client,
   email: EmailRow,
   subject: string,
+  senderEmail: string,
 ): Promise<void> {
   if (!email.contact_id) return;
 
@@ -112,20 +120,13 @@ async function logSentEmail(
     notes: `Poslat mejl: „${subject}”`,
   });
 
-  const [{ data: sender }, { data: current }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("email")
-      .eq("id", email.user_id)
-      .maybeSingle(),
-    supabase
-      .from("contact_status")
-      .select("communication_status")
-      .eq("contact_id", email.contact_id)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const { data: current } = await supabase
+    .from("contact_status")
+    .select("communication_status")
+    .eq("contact_id", email.contact_id)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   // Status se podiže na "Poslato" samo sa početnog stanja — bolji ishodi
   // ("Dobijen odgovor", "Prihvaćeno"…) se ne vraćaju unazad
@@ -135,7 +136,7 @@ async function logSentEmail(
       supabase,
       email.contact_id,
       { communication_status: "Poslato" },
-      sender?.email ?? "sistem",
+      senderEmail,
     );
   }
 }
@@ -159,11 +160,18 @@ async function send(
   supabase: Client,
   email: EmailRow,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { data: token } = await supabase
-    .from("google_tokens")
-    .select("id, google_email, refresh_token_enc, status")
-    .eq("user_id", email.user_id)
-    .maybeSingle();
+  const [{ data: token }, { data: sender }] = await Promise.all([
+    supabase
+      .from("google_tokens")
+      .select("id, google_email, refresh_token_enc, status")
+      .eq("user_id", email.user_id)
+      .maybeSingle(),
+    supabase
+      .from("users")
+      .select("full_name, email")
+      .eq("id", email.user_id)
+      .maybeSingle(),
+  ]);
 
   if (!token) {
     return markFailed(supabase, email.id, "Gmail nalog nije povezan.");
@@ -196,6 +204,11 @@ async function send(
     return markFailed(supabase, email.id, "Neuspešna prijava na Gmail.");
   }
 
+  const senderData = {
+    full_name: sender?.full_name ?? null,
+    email: sender?.email ?? token.google_email,
+  };
+
   // Zaštitna mreža: ako je u tekstu ostao {{placeholder}} (npr. iz šablona
   // koji korisnik nije pregledao), zamenjuje se pre slanja
   let subject = email.subject;
@@ -209,8 +222,8 @@ async function send(
       .maybeSingle();
 
     if (contact) {
-      subject = applyPlaceholders(subject, contact);
-      body = applyPlaceholders(body, contact);
+      subject = applyPlaceholders(subject, contact, senderData);
+      body = applyPlaceholders(body, contact, senderData);
     }
   }
 
@@ -219,13 +232,23 @@ async function send(
     return markFailed(supabase, email.id, attachments.error);
   }
 
+  // Telo je HTML (formatiran tekst, slike); stariji zapisi su čist tekst i
+  // konvertuju se ovde. Nalepljene slike (data: URL) postaju cid: delovi.
+  const { html, images } = extractInlineImages(
+    looksLikeHtml(body) ? sanitizeEmailHtml(body) : textToHtml(body),
+  );
+
   const mime = buildMimeMessage({
     from: token.google_email,
+    // Bez ovoga primalac u sandučetu vidi samo golu adresu
+    fromName: senderData.full_name,
     to: email.to_email,
     cc: email.cc,
     bcc: email.bcc,
     subject,
-    bodyText: body,
+    bodyText: htmlToText(html),
+    bodyHtml: html,
+    inlineImages: images,
     attachments: attachments.attachments,
   });
 
@@ -244,7 +267,7 @@ async function send(
     })
     .eq("id", email.id);
 
-  await logSentEmail(supabase, email, subject);
+  await logSentEmail(supabase, email, subject, senderData.email);
 
   return { ok: true };
 }

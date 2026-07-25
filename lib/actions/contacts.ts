@@ -1,6 +1,10 @@
 "use server";
 
-import { COMMUNICATION_STATUSES, INTEREST_TAGS } from "@/lib/constants";
+import {
+  COMMUNICATION_STATUSES,
+  CONTACT_CATEGORIES,
+  INTEREST_TAGS,
+} from "@/lib/constants";
 import { setContactStatus } from "@/lib/contact-status";
 import { checkRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +23,7 @@ export type ContactInput = {
   phone?: string;
   mobile_phone?: string;
   city?: string;
+  category?: string;
   notes?: string;
 };
 
@@ -31,12 +36,12 @@ type ContactRowInput = {
   phone: string | null;
   mobile_phone: string | null;
   city: string | null;
+  category: string | null;
   notes: string | null;
 };
 
 type ParsedContact =
-  | { ok: true; row: ContactRowInput }
-  | { ok: false; error: string };
+  { ok: true; row: ContactRowInput } | { ok: false; error: string };
 
 function parseContactInput(input: ContactInput): ParsedContact {
   const first_name = cleanText(input.first_name, 100);
@@ -51,6 +56,12 @@ function parseContactInput(input: ContactInput): ParsedContact {
     return { ok: false, error: "Email adresa nije ispravna." };
   }
 
+  // Prazno je dozvoljeno i znači "bez kategorije"
+  const rawCategory = cleanText(input.category, 50);
+  if (rawCategory && !isOneOf(rawCategory, CONTACT_CATEGORIES)) {
+    return { ok: false, error: "Nepoznata kategorija." };
+  }
+
   return {
     ok: true,
     row: {
@@ -62,6 +73,7 @@ function parseContactInput(input: ContactInput): ParsedContact {
       phone: cleanText(input.phone, 50),
       mobile_phone: cleanText(input.mobile_phone, 50),
       city: cleanText(input.city, 100),
+      category: rawCategory,
       notes: cleanText(input.notes, 2000),
     },
   };
@@ -149,9 +161,7 @@ export async function getContactDeleteImpact(
   };
 }
 
-export async function deleteContact(
-  contactId: number,
-): Promise<ActionResult> {
+export async function deleteContact(contactId: number): Promise<ActionResult> {
   const me = await checkRole("admin");
   if (!me) return { ok: false, error: NO_PERMISSION };
 

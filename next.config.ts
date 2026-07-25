@@ -1,11 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  experimental: {
-    // Admin uploaduje priloge kroz server akciju; default je 1MB, a bucket
-    // dozvoljava fajlove do 4MB (vidi MAX_ATTACHMENT_BYTES)
-    serverActions: { bodySizeLimit: "5mb" },
-  },
-};
+// Prilozi ne prolaze kroz server akcije (idu potpisanim uploadom pravo u
+// Supabase Storage), pa podrazumevani limit tela requesta ostaje netaknut
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

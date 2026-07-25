@@ -1,7 +1,12 @@
 "use server";
 
-import { ATTACHMENTS_BUCKET, MAX_ATTACHMENT_BYTES } from "@/lib/constants";
+import {
+  ATTACHMENTS_BUCKET,
+  MAX_ATTACHMENT_BYTES,
+  MAX_BODY_CHARS,
+} from "@/lib/constants";
 import { checkRole } from "@/lib/dal";
+import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { cleanText, isId, normalizeEmail } from "@/lib/validate";
@@ -30,11 +35,17 @@ export async function saveEmailTemplate(
 
   const name = cleanText(input.name, 100);
   const subject = cleanText(input.subject, 300);
-  const body = cleanText(input.body, 10000);
 
   if (!name) return { ok: false, error: "Naziv šablona je obavezan." };
   if (!subject) return { ok: false, error: "Naslov je obavezan." };
-  if (!body) return { ok: false, error: "Telo mejla je obavezno." };
+
+  if ((input.body ?? "").length > MAX_BODY_CHARS) {
+    return { ok: false, error: "Šablon je prevelik." };
+  }
+
+  // Telo šablona je HTML iz editora
+  const body = sanitizeEmailHtml(input.body ?? "");
+  if (isEmptyHtml(body)) return { ok: false, error: "Telo mejla je obavezno." };
 
   const supabase = createClient();
 
@@ -94,47 +105,87 @@ function storageSafeName(filename: string): string {
   return cleaned || "prilog";
 }
 
-export async function uploadAttachmentTemplate(
-  formData: FormData,
-): Promise<ActionResult> {
+export type AttachmentUpload =
+  | { ok: true; uploadUrl: string; storagePath: string }
+  | { ok: false; error: string };
+
+// Fajl se ne provlači kroz server akciju: Vercel odbija telo requesta preko
+// 4.5MB, pa bi prilog od 10MB pukao. Umesto toga admin dobija potpisani URL
+// i šalje fajl pravo u Supabase Storage.
+export async function createAttachmentUpload(
+  fileName: string,
+  size: number,
+): Promise<AttachmentUpload> {
   const me = await checkRole("admin");
   if (!me) return { ok: false, error: NO_PERMISSION };
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!Number.isFinite(size) || size <= 0) {
     return { ok: false, error: "Izaberi fajl." };
   }
 
-  if (file.size > MAX_ATTACHMENT_BYTES) {
+  if (size > MAX_ATTACHMENT_BYTES) {
     return {
       ok: false,
       error: `Fajl je prevelik (najviše ${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB).`,
     };
   }
 
-  const name =
-    cleanText(String(formData.get("name") ?? ""), 150) ??
-    cleanText(file.name, 150);
+  const supabase = createClient();
+  const storagePath = `${Date.now()}-${storageSafeName(fileName)}`;
 
+  const { data, error } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .createSignedUploadUrl(storagePath);
+
+  if (error || !data) {
+    return { ok: false, error: "Greška pri pripremi otpremanja." };
+  }
+
+  return { ok: true, uploadUrl: data.signedUrl, storagePath };
+}
+
+// Drugi korak: fajl je već u bucketu, ovde se upisuju metapodaci.
+// Veličina i postojanje se čitaju iz Storage-a, ne veruje se klijentu.
+export async function saveAttachmentTemplate(input: {
+  name: string;
+  storagePath: string;
+  mimeType: string;
+}): Promise<ActionResult> {
+  const me = await checkRole("admin");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  const name = cleanText(input.name, 150);
   if (!name) return { ok: false, error: "Naziv priloga je obavezan." };
 
+  const storagePath = cleanText(input.storagePath, 200);
+  if (!storagePath) return { ok: false, error: "Fajl nije otpremljen." };
+
   const supabase = createClient();
-  const storagePath = `${Date.now()}-${storageSafeName(file.name)}`;
-  const mimeType = file.type || "application/octet-stream";
 
-  const { error: uploadError } = await supabase.storage
+  const { data: files } = await supabase.storage
     .from(ATTACHMENTS_BUCKET)
-    .upload(storagePath, file, { contentType: mimeType, upsert: false });
+    .list("", { search: storagePath, limit: 1 });
 
-  if (uploadError) {
-    return { ok: false, error: "Greška pri otpremanju fajla." };
+  const uploaded = files?.find((file) => file.name === storagePath);
+  if (!uploaded) return { ok: false, error: "Fajl nije otpremljen." };
+
+  const size = uploaded.metadata?.size ?? 0;
+  if (size > MAX_ATTACHMENT_BYTES) {
+    await supabase.storage.from(ATTACHMENTS_BUCKET).remove([storagePath]);
+    return {
+      ok: false,
+      error: `Fajl je prevelik (najviše ${Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024)} MB).`,
+    };
   }
 
   const { error } = await supabase.from("attachment_templates").insert({
     name,
     storage_path: storagePath,
-    mime_type: mimeType,
-    size_bytes: file.size,
+    mime_type:
+      uploaded.metadata?.mimetype ||
+      cleanText(input.mimeType, 100) ||
+      "application/octet-stream",
+    size_bytes: size,
   });
 
   if (error) {

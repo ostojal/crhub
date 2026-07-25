@@ -1,17 +1,20 @@
 import { CopyButton } from "@/components/copy-button";
 import { dashValue, SortableColumnHeader } from "@/components/data-table";
 import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { Role } from "@/lib/constants";
+import {
+  CONTACT_CATEGORIES,
+  CONTACT_CATEGORY_LABELS,
+  type Role,
+} from "@/lib/constants";
 import { formatPhoneNumber } from "@/lib/format";
+import { isOneOf } from "@/lib/validate";
 import { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { NotebookTextIcon } from "lucide-react";
 import Link from "next/link";
-import {
-  ContactActions,
-  type ContactActionHandlers,
-} from "./contact-actions";
+import { ContactActions, type ContactActionHandlers } from "./contact-actions";
 
 export type AssigneeOption = {
   id: number;
@@ -37,6 +40,7 @@ export type ContactRow = {
   phone?: string | null;
   mobile_phone?: string | null;
   city?: string | null;
+  category?: string | null;
   notes?: string | null;
   created_at?: string;
   contact_status?: {
@@ -184,11 +188,27 @@ export function buildContactColumns({
       cell: ({ getValue }) => dashValue(getValue()),
     },
     {
+      id: "category",
+      accessorKey: "category",
+      header: "Kategorija",
+      cell: ({ getValue }) => {
+        const value = getValue<string | null>();
+        if (!value || !isOneOf(value, CONTACT_CATEGORIES)) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        return (
+          <Badge variant="outline">{CONTACT_CATEGORY_LABELS[value]}</Badge>
+        );
+      },
+    },
+    {
       id: "email",
       accessorKey: "email",
       header: "Email",
+      // lowercase poništava `capitalize` sa reda tabele — inače bi adresa
+      // izgledala kao "Pera.peric@Gmail.com"
       cell: ({ row, getValue }) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 lowercase">
           {dashValue(getValue())}
           {row.original.email && (
             <CopyButton value={row.original.email} label="Email" />
@@ -260,6 +280,8 @@ export function columnIdToLabel(columnId: string) {
       return "Pozicija";
     case "city":
       return "Grad";
+    case "category":
+      return "Kategorija";
     case "email":
       return "Email";
     case "mobile_phone":

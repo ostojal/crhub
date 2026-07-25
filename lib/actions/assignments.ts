@@ -233,8 +233,7 @@ export async function unassignContact(
 }
 
 export type CompanyAssignmentInfo =
-  | { ok: true; total: number; assigned: number }
-  | { ok: false; error: string };
+  { ok: true; total: number; assigned: number } | { ok: false; error: string };
 
 // Read helper za dijalog dodele: koliko kontakata firma ima i koliko ih je
 // već dodeljeno nekom korisniku
