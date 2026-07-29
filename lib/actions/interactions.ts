@@ -112,6 +112,8 @@ export async function logInteractions(
   }
   revalidatePath("/moji-kontakti");
   revalidatePath("/analitika");
+  // Strana firme prikazuje status i broj kontaktiranja
+  revalidatePath("/firme/[company]", "page");
 
   return {
     ok: true,

@@ -94,9 +94,8 @@ export default async function ContactsPage({
     } else {
       query.order(sortId, { ascending: asc });
     }
-  } else if (isAdmin) {
-    query.order("created_at", { ascending: false });
   } else {
+    // Podrazumevano abecedno po firmi (kontakti bez firme idu na kraj)
     query.order("company", { ascending: true });
   }
 

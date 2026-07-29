@@ -228,14 +228,9 @@ export function ContactsTable({
     [contactsCount],
   );
 
-  // Editor podrazumevano gleda po firmi, admin po datumu dodavanja
-  const defaultSort = useMemo(
-    () =>
-      isAdmin
-        ? { id: "created_at", desc: true }
-        : { id: "company", desc: false },
-    [isAdmin],
-  );
+  // Podrazumevano abecedno po firmi — mora da prati redosled sa servera
+  // (app/contacts/page.tsx), inače bi strelica pokazivala pogrešnu kolonu
+  const defaultSort = useMemo(() => ({ id: "company", desc: false }), []);
 
   const searchParams = useSearchParams();
   const page = useMemo(

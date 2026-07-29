@@ -2,17 +2,31 @@
 
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetchImageAsDataUrl } from "@/lib/actions/images";
 import { MAX_INLINE_IMAGE_BYTES } from "@/lib/constants";
-import { looksLikeHtml, sanitizeEmailHtml, textToHtml } from "@/lib/email/html";
+import {
+  imageSources,
+  isRemoteImageSource,
+  looksLikeHtml,
+  mapImageSources,
+  sanitizeEmailHtml,
+  textToHtml,
+} from "@/lib/email/html";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
+  BaselineIcon,
   BoldIcon,
   ImageIcon,
   ItalicIcon,
@@ -22,7 +36,7 @@ import {
   RemoveFormattingIcon,
   UnderlineIcon,
 } from "lucide-react";
-import { useEffect, useRef, type ClipboardEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent } from "react";
 import { toast } from "sonner";
 
 // Vrednosti koje prima execCommand("fontSize"); uz styleWithCSS daju
@@ -35,6 +49,20 @@ const FONT_SIZES = [
 ];
 
 const DEFAULT_FONT_SIZE = "3";
+
+// Boje se upisuju kao hex u inline style — svaki mejl klijent ih razume
+const FONT_COLORS = [
+  { value: "#000000", label: "Crna" },
+  { value: "#4b5563", label: "Siva" },
+  { value: "#b91c1c", label: "Crvena" },
+  { value: "#ea580c", label: "Narandžasta" },
+  { value: "#ca8a04", label: "Žuta" },
+  { value: "#15803d", label: "Zelena" },
+  { value: "#0e7490", label: "Tirkizna" },
+  { value: "#1d4ed8", label: "Plava" },
+  { value: "#6d28d9", label: "Ljubičasta" },
+  { value: "#be185d", label: "Roze" },
+];
 
 export function RichTextEditor({
   defaultValue,
@@ -51,6 +79,10 @@ export function RichTextEditor({
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Izbor teksta se pamti jer ga otvaranje padajućeg menija (veličina, boja)
+  // ruši — bez toga bi se komanda primenila na prazan izbor
+  const selectionRef = useRef<Range | null>(null);
+  const [colorOpen, setColorOpen] = useState(false);
 
   // Nekontrolisano polje: sadržaj se upisuje jednom, inače bi kursor skakao
   // na svaki otkucani znak. Zamena sadržaja se radi preko `key` propa.
@@ -69,12 +101,40 @@ export function RichTextEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const remember = () => {
+      const editor = editorRef.current;
+      const selection = window.getSelection();
+      if (!editor || !selection?.rangeCount) return;
+
+      const range = selection.getRangeAt(0);
+      if (editor.contains(range.commonAncestorContainer)) {
+        selectionRef.current = range.cloneRange();
+      }
+    };
+
+    document.addEventListener("selectionchange", remember);
+    return () => document.removeEventListener("selectionchange", remember);
+  }, []);
+
+  const restoreSelection = () => {
+    const editor = editorRef.current;
+    const range = selectionRef.current;
+    if (!editor || !range) return;
+    if (!editor.contains(range.commonAncestorContainer)) return;
+
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  };
+
   const emitChange = () => {
     if (editorRef.current) onChange(editorRef.current.innerHTML);
   };
 
   const run = (command: string, value?: string) => {
     editorRef.current?.focus();
+    restoreSelection();
     document.execCommand(command, false, value);
     emitChange();
   };
@@ -113,10 +173,65 @@ export function RichTextEditor({
     }
 
     const html = event.clipboardData.getData("text/html");
-    if (html) {
-      event.preventDefault();
-      run("insertHTML", sanitizeEmailHtml(html));
+    if (!html) return;
+
+    event.preventDefault();
+    const clean = sanitizeEmailHtml(html);
+
+    // Samo data: slike se prikazuju svuda. Ostalo iz tuđeg mejla (cid:,
+    // blob:, relativne putanje) ostaje prekinuto, pa izlazi iz teksta.
+    const keepEmbedded = (src: string) =>
+      src.startsWith("data:") ? src : null;
+
+    const remote = [
+      ...new Set(imageSources(clean).filter(isRemoteImageSource)),
+    ];
+    if (remote.length === 0) {
+      run("insertHTML", mapImageSources(clean, keepEmbedded));
+      return;
     }
+
+    // Slike iz Gmail potpisa ostaju na Google-ovom serveru i ovde se
+    // prikazuju kao prekinute — povlače se preko servera i ugrađuju u tekst
+    const pending = toast.loading(
+      remote.length === 1 ? "Preuzimanje slike…" : "Preuzimanje slika…",
+    );
+
+    Promise.all(remote.map((src) => fetchImageAsDataUrl(src)))
+      .then((results) => {
+        const inlined = new Map(
+          remote.map((src, index) => {
+            const result = results[index];
+            return [src, result.ok ? result.dataUrl : null];
+          }),
+        );
+
+        // Slika koja se ne može povući izlazi iz teksta — prekinuta slika u
+        // potpisu izgleda gore nego nijedna
+        const failed = [...inlined.values()].filter(
+          (value) => value === null,
+        ).length;
+
+        run(
+          "insertHTML",
+          mapImageSources(clean, (src) =>
+            inlined.has(src) ? inlined.get(src)! : keepEmbedded(src),
+          ),
+        );
+
+        if (failed === 0) return;
+
+        toast.warning(
+          failed === remote.length
+            ? "Slike iz potpisa nisu mogle da se preuzmu jer su zaključane za Gmail nalog. Sačuvaj ih na računar i dodaj dugmetom za sliku."
+            : `${failed} od ${remote.length} slika nije moglo da se preuzme. Dodaj ih dugmetom za sliku.`,
+        );
+      })
+      .catch(() => {
+        run("insertHTML", mapImageSources(clean, keepEmbedded));
+        toast.error("Greška pri preuzimanju slika iz nalepljenog sadržaja.");
+      })
+      .finally(() => toast.dismiss(pending));
   };
 
   const handleLink = () => {
@@ -166,6 +281,41 @@ export function RichTextEditor({
             ))}
           </SelectContent>
         </Select>
+
+        <DropdownMenu open={colorOpen} onOpenChange={setColorOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="Boja slova"
+              aria-label="Boja slova"
+              onMouseDown={keepFocus}
+            >
+              <BaselineIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-auto min-w-max p-2">
+            <div className="grid grid-cols-5 gap-1">
+              {FONT_COLORS.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  title={color.label}
+                  aria-label={color.label}
+                  onMouseDown={keepFocus}
+                  onClick={() => {
+                    run("foreColor", color.value);
+                    setColorOpen(false);
+                  }}
+                  className="size-6 rounded-full border border-foreground/20 transition-transform hover:scale-110"
+                  style={{ backgroundColor: color.value }}
+                />
+              ))}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <ToolbarButton label="Lista" onClick={() => run("insertUnorderedList")}>
           <ListIcon className="size-4" />

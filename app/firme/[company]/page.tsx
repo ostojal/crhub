@@ -39,24 +39,28 @@ export default async function CompanyPage({
 }: {
   params: Promise<{ company: string }>;
 }) {
-  await requireRole("admin");
-
   const { company: rawCompany } = await params;
   const company = decodeURIComponent(rawCompany);
 
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("contacts")
-    .select(
-      "id, first_name, last_name, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at), assignments(users(full_name)), interactions(count)",
-    )
-    .eq("company", company)
-    .order("updated_at", {
-      referencedTable: "contact_status",
-      ascending: false,
-    })
-    .order("last_name", { ascending: true })
-    .order("first_name", { ascending: true });
+
+  // Provera uloge i upit idu istim kruženjem do baze; kad uloga ne odgovara,
+  // requireRole preusmerava i dohvaćeni redovi se nikad ne prikažu
+  const [, { data, error }] = await Promise.all([
+    requireRole("admin"),
+    supabase
+      .from("contacts")
+      .select(
+        "id, first_name, last_name, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at), assignments(users(full_name)), interactions(count)",
+      )
+      .eq("company", company)
+      .order("updated_at", {
+        referencedTable: "contact_status",
+        ascending: false,
+      })
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true }),
+  ]);
 
   if (error) {
     return (
@@ -111,9 +115,8 @@ export default async function CompanyPage({
       <div className="space-y-3 md:hidden">
         {contacts.map((contact) => {
           const name =
-            [contact.first_name, contact.last_name]
-              .filter(Boolean)
-              .join(" ") || "—";
+            [contact.first_name, contact.last_name].filter(Boolean).join(" ") ||
+            "—";
           const phoneRaw = contact.phone ?? contact.mobile_phone;
           const status = contact.contact_status[0] ?? null;
           const interactionsCount = contact.interactions[0]?.count ?? 0;

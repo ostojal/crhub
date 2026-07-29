@@ -84,6 +84,9 @@ function revalidateContactPaths(contactId?: number) {
   if (contactId) revalidatePath(`/contacts/${contactId}`);
   revalidatePath("/moji-kontakti");
   revalidatePath("/analitika");
+  // Strana firme prikazuje iste kontakte; firma se pri izmeni može i
+  // promeniti, pa se osvežavaju sve
+  revalidatePath("/firme/[company]", "page");
 }
 
 export async function createContact(

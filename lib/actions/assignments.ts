@@ -12,6 +12,8 @@ const MAX_BULK = 25;
 function revalidateAssignmentPaths() {
   revalidatePath("/contacts");
   revalidatePath("/moji-kontakti");
+  // Strana firme prikazuje kolonu „Dodeljen"
+  revalidatePath("/firme/[company]", "page");
 }
 
 // Dodela sme da ide samo na naloge sa ulogom 'user'

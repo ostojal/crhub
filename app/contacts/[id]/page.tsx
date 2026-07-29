@@ -22,12 +22,13 @@ export default async function ContactDetailPage({
   const contactId = Number(rawId);
   if (!Number.isInteger(contactId) || contactId <= 0) notFound();
 
-  const me = await requireContactAccess(contactId);
-
   const supabase = createClient();
 
-  // Kontakt i istorija interakcija idu paralelno — oba znaju contactId
-  const [{ data: contact }, { data: interactions }] = await Promise.all([
+  // Provera pristupa i podaci idu istim kruženjem do baze — svi znaju
+  // contactId. Kad pristupa nema, requireContactAccess preusmerava i render
+  // nikad ne stigne do dohvaćenih redova.
+  const [me, { data: contact }, { data: interactions }] = await Promise.all([
+    requireContactAccess(contactId),
     supabase
       .from("contacts")
       .select(

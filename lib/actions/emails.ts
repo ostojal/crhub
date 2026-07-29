@@ -50,6 +50,8 @@ function revalidateEmailPaths(contactId: number) {
   revalidatePath(`/contacts/${contactId}`);
   revalidatePath("/moji-kontakti");
   revalidatePath("/analitika");
+  // Poslat mejl se evidentira kao kontaktiranje, što strana firme prikazuje
+  revalidatePath("/firme/[company]", "page");
 }
 
 export type ComposeContact = {

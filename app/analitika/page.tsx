@@ -36,14 +36,18 @@ export default async function AnalyticsPage({
 
   if (userParam && Number.isInteger(targetId) && targetId > 0) {
     const supabase = createClient();
-    const { data: target } = await supabase
-      .from("users")
-      .select("id, full_name, email")
-      .eq("id", targetId)
-      .maybeSingle();
+
+    // Statistika zavisi samo od id-ja iz URL-a, pa ne mora da čeka ime
+    const [{ data: target }, stats] = await Promise.all([
+      supabase
+        .from("users")
+        .select("id, full_name, email")
+        .eq("id", targetId)
+        .maybeSingle(),
+      getUserStats(targetId),
+    ]);
 
     if (target) {
-      const stats = await getUserStats(target.id);
       const name = target.full_name || target.email || `Korisnik #${target.id}`;
 
       return (

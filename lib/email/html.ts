@@ -74,6 +74,56 @@ export function isEmptyHtml(html: string): boolean {
   return !htmlToText(html) && !/<img\s/i.test(html);
 }
 
+// Slike u sadržaju nalepljenom iz drugog mejl klijenta (npr. Gmail potpis)
+// ostaju na tuđem serveru. Te adrese traže prijavu koju pretraživač ovde
+// nema, pa se slika prikazuje kao prekinuta — zato se pri lepljenju
+// zamenjuju data: URL-om (vidi lib/actions/images.ts).
+const IMG_TAG_PATTERN = /<img\b[^>]*>/gi;
+const IMG_SRC_PATTERN = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
+
+// Adresa u atributu je HTML-kodirana (Gmail piše `&amp;` između parametara),
+// a mrežni poziv traži pravu adresu
+function decodeAttribute(value: string): string {
+  return value
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&");
+}
+
+function encodeAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function tagSource(tag: string): string {
+  const match = tag.match(IMG_SRC_PATTERN);
+  return decodeAttribute(match?.[1] ?? match?.[2] ?? "");
+}
+
+export function isRemoteImageSource(src: string): boolean {
+  return /^https?:\/\//i.test(src);
+}
+
+export function imageSources(html: string): string[] {
+  return (html.match(IMG_TAG_PATTERN) ?? []).map(tagSource).filter(Boolean);
+}
+
+// `replace` vraća novu adresu, ili null da se slika izbaci iz teksta
+export function mapImageSources(
+  html: string,
+  replace: (src: string) => string | null,
+): string {
+  return html.replace(IMG_TAG_PATTERN, (tag) => {
+    const src = tagSource(tag);
+    const next = replace(src);
+
+    if (next === null) return "";
+    if (next === src) return tag;
+    return tag.replace(IMG_SRC_PATTERN, () => `src="${encodeAttribute(next)}"`);
+  });
+}
+
 export type InlineImage = {
   cid: string;
   mimeType: string;
