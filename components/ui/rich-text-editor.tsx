@@ -13,9 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fetchImageAsDataUrl } from "@/lib/actions/images";
+import {
+  fetchImageAsDataUrl,
+  type ImageFetchFailure,
+} from "@/lib/actions/images";
 import { MAX_INLINE_IMAGE_BYTES } from "@/lib/constants";
 import {
+  htmlToText,
   imageSources,
   isRemoteImageSource,
   looksLikeHtml,
@@ -63,6 +67,24 @@ const FONT_COLORS = [
   { value: "#6d28d9", label: "Ljubičasta" },
   { value: "#be185d", label: "Roze" },
 ];
+
+// „Podrazumevana boja" znači da u tekstu nema `color` — tako poruku prikazuje
+// podrazumevanom bojom klijent primaoca (bitno za tamnu temu). Boja se prvo
+// postavi na ovu neverovatnu vrednost, jer execCommand time iseca <span>-ove
+// tačno na granicama izbora, pa se onda samo ona uklanja.
+const COLOR_RESET_SENTINEL = "#010203";
+const COLOR_RESET_COMPUTED = "rgb(1, 2, 3)";
+
+const IMAGE_FAILURE_MESSAGES: Record<ImageFetchFailure, string> = {
+  unauthorized:
+    "Slika je zaključana za tvoj Gmail nalog. Kopiraj potpis iz Gmail podešavanja (Settings → Signature) ili je dodaj dugmetom za sliku.",
+  not_image:
+    "Na adresi slike stoji strana za prijavu, a ne slika. Kopiraj potpis iz Gmail podešavanja (Settings → Signature) ili je dodaj dugmetom za sliku.",
+  too_large: "Slika je prevelika za ugrađivanje u tekst.",
+  not_found: "Slika više ne postoji na svojoj adresi.",
+  network: "Server sa slikom se nije odazvao.",
+  blocked_url: "Adresa slike nije dozvoljena.",
+};
 
 export function RichTextEditor({
   defaultValue,
@@ -139,6 +161,43 @@ export function RichTextEditor({
     emitChange();
   };
 
+  // Vraća izabrani tekst na podrazumevanu boju tako što mu uklanja `color`
+  const resetColor = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    restoreSelection();
+
+    // Bez izabranog teksta execCommand ne bi ništa obojio, ali bi zapamtio
+    // sentinel za sledeći otkucani znak — zato se tu ne dira ništa
+    const selection = window.getSelection();
+    if (!selection?.rangeCount || selection.getRangeAt(0).collapsed) return;
+
+    // Sentinel boja služi samo tome da execCommand iseca <span>-ove tačno na
+    // granicama izbora; ručno cepanje opsega to ne bi uradilo pouzdano.
+    // styleWithCSS se potvrđuje ovde jer se ovaj korak oslanja na to da boja
+    // završi u `style`, a ne u zastarelom <font color>.
+    document.execCommand("styleWithCSS", false, "true");
+    document.execCommand("foreColor", false, COLOR_RESET_SENTINEL);
+
+    for (const element of editor.querySelectorAll<HTMLElement>("[style]")) {
+      if (element.style.color !== COLOR_RESET_COMPUTED) continue;
+
+      element.style.removeProperty("color");
+      if (!element.getAttribute("style")) element.removeAttribute("style");
+
+      // <span> bez ijednog atributa više ništa ne radi
+      if (element.tagName === "SPAN" && element.attributes.length === 0) {
+        element.replaceWith(...element.childNodes);
+      }
+    }
+
+    // Boju zadatu zastarelim <font color> (dolazi iz nalepljenog Gmail
+    // sadržaja) ovo ne dira — za to postoji „Ukloni formatiranje".
+    emitChange();
+  };
+
   const insertImageFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
 
@@ -162,21 +221,25 @@ export function RichTextEditor({
   // Nalepljeni sadržaj se propušta kroz sanitizaciju, a slike iz clipboard-a
   // se ubacuju kao data: URL (kasnije postaju cid: delovi mejla)
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const html = event.clipboardData.getData("text/html");
+    const clean = html ? sanitizeEmailHtml(html) : "";
+
     const image = Array.from(event.clipboardData.files).find((file) =>
       file.type.startsWith("image/"),
     );
 
-    if (image) {
+    // Kopirana je gola slika (bez teksta): bajtovi sa clipboard-a su pouzdaniji
+    // od ponovnog preuzimanja s mreže. Kad ima i teksta — kao kod potpisa —
+    // mora HTML put, inače bi se ceo potpis sveo na jednu sliku.
+    if (image && !htmlToText(clean).trim()) {
       event.preventDefault();
       insertImageFile(image);
       return;
     }
 
-    const html = event.clipboardData.getData("text/html");
     if (!html) return;
 
     event.preventDefault();
-    const clean = sanitizeEmailHtml(html);
 
     // Samo data: slike se prikazuju svuda. Ostalo iz tuđeg mejla (cid:,
     // blob:, relativne putanje) ostaje prekinuto, pa izlazi iz teksta.
@@ -208,9 +271,9 @@ export function RichTextEditor({
 
         // Slika koja se ne može povući izlazi iz teksta — prekinuta slika u
         // potpisu izgleda gore nego nijedna
-        const failed = [...inlined.values()].filter(
-          (value) => value === null,
-        ).length;
+        const failures = results.flatMap((result, index) =>
+          result.ok ? [] : [{ src: remote[index], ...result }],
+        );
 
         run(
           "insertHTML",
@@ -219,13 +282,35 @@ export function RichTextEditor({
           ),
         );
 
-        if (failed === 0) return;
+        if (failures.length === 0) return;
 
-        toast.warning(
-          failed === remote.length
-            ? "Slike iz potpisa nisu mogle da se preuzmu jer su zaključane za Gmail nalog. Sačuvaj ih na računar i dodaj dugmetom za sliku."
-            : `${failed} od ${remote.length} slika nije moglo da se preuzme. Dodaj ih dugmetom za sliku.`,
-        );
+        // Cela adresa i razlog idu u konzolu — bez toga se pri prijavi
+        // problema samo nagađa koja je slika pala i zašto
+        for (const failure of failures) {
+          console.warn(
+            `[potpis] slika nije preuzeta (${failure.reason}${failure.status ? `, HTTP ${failure.status}` : ""}): ${failure.src}`,
+          );
+        }
+
+        // Razlozi su po slici, ali gotovo uvek isti za sve — poruka nosi
+        // najčešći, uz broj neuspelih kad ih je više
+        const reasons = failures.map((failure) => failure.reason);
+        const commonReason = reasons
+          .slice()
+          .sort(
+            (a, b) =>
+              reasons.filter((r) => r === b).length -
+              reasons.filter((r) => r === a).length,
+          )[0];
+
+        const count =
+          failures.length === remote.length
+            ? remote.length === 1
+              ? "Slika iz nalepljenog sadržaja nije ugrađena."
+              : "Nijedna slika iz nalepljenog sadržaja nije ugrađena."
+            : `${failures.length} od ${remote.length} slika nije ugrađeno.`;
+
+        toast.warning(`${count} ${IMAGE_FAILURE_MESSAGES[commonReason]}`);
       })
       .catch(() => {
         run("insertHTML", mapImageSources(clean, keepEmbedded));
@@ -296,7 +381,10 @@ export function RichTextEditor({
               <BaselineIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-auto min-w-max p-2">
+          <DropdownMenuContent
+            align="start"
+            className="w-auto min-w-max space-y-1 p-2"
+          >
             <div className="grid grid-cols-5 gap-1">
               {FONT_COLORS.map((color) => (
                 <button
@@ -314,6 +402,20 @@ export function RichTextEditor({
                 />
               ))}
             </div>
+
+            {/* Bez boje u tekstu poruku prikazuje podrazumevanom bojom
+                klijent primaoca */}
+            <button
+              type="button"
+              onMouseDown={keepFocus}
+              onClick={() => {
+                resetColor();
+                setColorOpen(false);
+              }}
+              className="w-full rounded-xl px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+            >
+              Podrazumevana boja
+            </button>
           </DropdownMenuContent>
         </DropdownMenu>
 

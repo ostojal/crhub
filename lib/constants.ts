@@ -92,10 +92,14 @@ export const MAX_TOTAL_ATTACHMENT_BYTES = 15 * 1024 * 1024;
 export const ATTACHMENTS_BUCKET = "email-attachments";
 
 // Slike nalepljene u telo mejla putuju kao data: URL kroz server akciju, a
-// Vercel odbija telo requesta preko 4.5MB — otud ovako postavljene granice
+// Vercel odbija telo requesta preko 4.5MB — otud ovako postavljene granice.
+// Base64 uveća sliku za oko trećinu, pa slika od 1MB zauzme ~1.37M znakova;
+// granice u znakovima moraju da to prate, inače se potpis sa logom preuzme
+// ali ne može da se sačuva.
 export const MAX_INLINE_IMAGE_BYTES = 1024 * 1024;
-export const MAX_BODY_CHARS = 2_000_000;
-export const MAX_SIGNATURE_CHARS = 200_000;
+// Telo = poruka + potpis, pa mora da bude veće od potpisa, a ispod 4.5MB
+export const MAX_BODY_CHARS = 3_500_000;
+export const MAX_SIGNATURE_CHARS = 1_500_000;
 
 // Koliko unapred sme da se zakaže slanje
 export const MAX_SCHEDULE_DAYS = 60;
