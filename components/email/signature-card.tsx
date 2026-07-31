@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { updateEmailSignature } from "@/lib/actions/emails";
 import { SENDER_PLACEHOLDERS } from "@/lib/email/placeholders";
@@ -25,13 +24,15 @@ export function SignatureCard({ signature }: { signature: string | null }) {
     });
   };
 
+  // Potpis se posle početnog podešavanja retko dira, pa stoji sklopljen —
+  // stranica ostaje na listi mejlova, zbog koje se i otvara
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Potpis</CardTitle>
-      </CardHeader>
+    <details className="rounded-md border">
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
+        Potpis
+      </summary>
 
-      <CardContent className="space-y-3">
+      <div className="space-y-3 border-t p-3">
         <p className="text-sm text-muted-foreground">
           Dodaje se na kraj svakog mejla koji sastaviš. Podržava formatiranje i
           slike (logo, baner) — nalepi ih pravo u polje. Možeš koristiti{" "}
@@ -56,7 +57,7 @@ export function SignatureCard({ signature }: { signature: string | null }) {
             </span>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

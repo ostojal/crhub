@@ -37,12 +37,15 @@ export type LogContact = { id: number; name: string };
 // radi i za jedan i za više kontakata odjednom
 export function LogInteractionDialog({
   contacts,
+  defaultType,
   onClose,
 }: {
   contacts: LogContact[];
+  // Podsetnik za poziv otvara dijalog sa već izabranim tipom
+  defaultType?: string;
   onClose: () => void;
 }) {
-  const [type, setType] = useState<string>(INTERACTION_TYPES[0]);
+  const [type, setType] = useState<string>(defaultType ?? INTERACTION_TYPES[0]);
   const [status, setStatus] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [tag, setTag] = useState<string>(NO_CHANGE);

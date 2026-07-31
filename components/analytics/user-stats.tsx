@@ -8,13 +8,14 @@ export function UserStatsView({ stats }: { stats: UserStats }) {
   const tiles = [
     { label: "Dodeljeni kontakti", value: stats.assignedTotal },
     { label: "Kontaktirano (različitih)", value: stats.contactedCount },
-    { label: "Ukupno interakcija", value: stats.interactionsTotal },
+    { label: "Poslati mejlovi (iz aplikacije)", value: stats.sentEmails },
+    { label: "Ručno evidentirano", value: stats.manualLogs },
     { label: "Poslednjih 30 dana", value: stats.last30Days },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {tiles.map((tile) => (
           <Card key={tile.label} size="sm">
             <CardHeader className="pb-2">
@@ -38,7 +39,7 @@ export function UserStatsView({ stats }: { stats: UserStats }) {
           items={stats.byStatus}
         />
         <BarListCard
-          title="Poslati mejlovi po kategoriji"
+          title="Kontaktirani partneri po kategoriji"
           items={stats.byCategory}
         />
       </div>

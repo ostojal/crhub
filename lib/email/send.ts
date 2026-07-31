@@ -128,14 +128,25 @@ async function logSentEmail(
     .limit(1)
     .maybeSingle();
 
-  // Status se podiže na "Poslato" samo sa početnog stanja — bolji ishodi
-  // ("Dobijen odgovor", "Prihvaćeno"…) se ne vraćaju unazad
+  // Lestvica ide samo naviše — bolji ishodi ("Dobijen odgovor", "Prihvaćeno"…)
+  // se ne vraćaju unazad:
+  //   prazno / "Nije kontaktiran" → "Poslato"
+  //   "Poslato" / "Poslati follow up" → "Poslat follow up"
+  // Drugi mejl istom kontaktu jeste follow up, pa se evidentira sam od sebe.
   const status = current?.communication_status;
-  if (!status || status === "Nije kontaktiran") {
+
+  const next =
+    !status || status === "Nije kontaktiran"
+      ? "Poslato"
+      : status === "Poslato" || status === "Poslati follow up"
+        ? "Poslat follow up"
+        : null;
+
+  if (next) {
     await setContactStatus(
       supabase,
       email.contact_id,
-      { communication_status: "Poslato" },
+      { communication_status: next },
       senderEmail,
     );
   }

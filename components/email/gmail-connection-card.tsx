@@ -79,39 +79,57 @@ export function GmailConnectionCard({
 
   const isBroken = connection?.status === "broken";
 
+  // Uobičajeno stanje (nalog povezan i ispravan) nosi jednu informaciju, pa
+  // stoji kao tanka traka; puna kartica sa objašnjenjem ostaje samo tamo gde
+  // je tekst zaista potreban — kad nalog nije povezan ili je veza pukla.
+  if (connection && !isBroken) {
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm">
+        <MailIcon className="size-4 shrink-0 text-muted-foreground" />
+        <span className="text-muted-foreground">Gmail:</span>
+        <span className="min-w-0 truncate font-medium">
+          {connection.google_email}
+        </span>
+        <div className="ms-auto flex gap-1">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/api/google/connect" prefetch={false}>
+              Poveži ponovo
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDisconnect}
+            disabled={isPending}
+          >
+            Prekini vezu
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Gmail nalog</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {!connection && (
+        {isBroken ? (
+          <p className="flex items-start gap-2 text-sm text-amber-600 dark:text-amber-500">
+            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+            Veza sa nalogom {connection?.google_email} više ne važi (pristup je
+            opozvan ili je istekao). Poveži nalog ponovo da bi slanje radilo.
+          </p>
+        ) : (
           <p className="text-sm text-muted-foreground">
             Poveži svoj Gmail nalog da bi slao mejlove direktno iz aplikacije.
             Mejlovi odlaze sa tvoje adrese, a odgovori stižu u tvoje sanduče.
           </p>
         )}
 
-        {connection && !isBroken && (
-          <p className="text-sm">
-            Povezan nalog:{" "}
-            <span className="font-medium">{connection.google_email}</span>
-          </p>
-        )}
-
-        {isBroken && (
-          <p className="flex items-start gap-2 text-sm text-amber-600 dark:text-amber-500">
-            <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-            Veza sa nalogom {connection?.google_email} više ne važi (pristup je
-            opozvan ili je istekao). Poveži nalog ponovo da bi slanje radilo.
-          </p>
-        )}
-
         <div className="flex flex-wrap gap-2">
-          <Button
-            asChild
-            variant={connection && !isBroken ? "outline" : "default"}
-          >
+          <Button asChild>
             <Link href="/api/google/connect" prefetch={false}>
               <MailIcon data-icon="inline-start" />
               {connection ? "Poveži ponovo" : "Poveži Gmail"}

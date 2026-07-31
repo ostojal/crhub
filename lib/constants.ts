@@ -45,9 +45,12 @@ export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
 };
 
 // Vrednosti Postgres enuma `public.status` — moraju se poklapati sa bazom
+// (db/follow-up.sql). Redosled vodi padajuće liste i redosled u analitici.
 export const COMMUNICATION_STATUSES = [
   "Nije kontaktiran",
   "Poslato",
+  "Poslati follow up",
+  "Poslat follow up",
   "Dobijen odgovor",
   "Na čekanju",
   "Prihvaćeno",
@@ -103,3 +106,9 @@ export const MAX_SIGNATURE_CHARS = 1_500_000;
 
 // Koliko unapred sme da se zakaže slanje
 export const MAX_SCHEDULE_DAYS = 60;
+
+// --- Follow up (db/follow-up.sql) ---
+
+// Isti opseg kao check ograničenje na app_settings
+export const MIN_FOLLOW_UP_DAYS = 1;
+export const MAX_FOLLOW_UP_DAYS = 30;

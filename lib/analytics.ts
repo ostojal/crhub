@@ -33,7 +33,10 @@ export type RecentInteraction = {
 export type UserStats = {
   assignedTotal: number;
   contactedCount: number;
-  interactionsTotal: number;
+  // Mejlovi poslati iz aplikacije i ručno evidentirana kontaktiranja stoje
+  // odvojeno: zbir bi bio veći od broja kontakata i delovao kao greška
+  sentEmails: number;
+  manualLogs: number;
   last30Days: number;
   byType: CountItem[];
   byStatus: CountItem[];
@@ -41,15 +44,20 @@ export type UserStats = {
   recent: RecentInteraction[];
 };
 
-// Poslati mejlovi razvrstani po kategoriji partnera kome su poslati.
+// Kontaktirani partneri razvrstani po kategoriji. Broje se RAZLIČITI kontakti
+// kojima je poslat bar jedan mejl, ne redovi u tabeli mejlova — dva mejla
+// istom partneru su i dalje jedan kontaktiran partner.
 // userId izostavljen = ceo tim.
-export async function getSentByCategory(userId?: number): Promise<CountItem[]> {
+export async function getContactedByCategory(
+  userId?: number,
+): Promise<CountItem[]> {
   const supabase = createClient();
 
   const query = supabase
     .from("emails")
-    .select("contacts(category)")
+    .select("contact_id, contacts(category)")
     .eq("status", "sent")
+    .not("contact_id", "is", null)
     .limit(ROW_LIMIT);
 
   if (userId !== undefined) query.eq("user_id", userId);
@@ -57,7 +65,11 @@ export async function getSentByCategory(userId?: number): Promise<CountItem[]> {
   const { data } = await query;
 
   const counts = new Map<string, number>();
+  const seen = new Set<number>();
   for (const row of data ?? []) {
+    if (row.contact_id === null || seen.has(row.contact_id)) continue;
+    seen.add(row.contact_id);
+
     const category = row.contacts?.category;
     const label =
       category && isOneOf(category, CONTACT_CATEGORIES)
@@ -91,35 +103,51 @@ function interactionTypeLabel(type: string | null): string {
 export async function getUserStats(userId: number): Promise<UserStats> {
   const supabase = createClient();
 
-  const [assignedRes, interactionsRes, statusRes, recentRes, byCategory] =
-    await Promise.all([
-      supabase
-        .from("assignments")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
-      supabase
-        .from("interactions")
-        .select("contact_id, type, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(ROW_LIMIT),
-      supabase
-        .from("assignments")
-        .select(
-          "contacts(id, contact_status(communication_status, updated_at))",
-        )
-        .eq("user_id", userId)
-        .limit(ROW_LIMIT),
-      supabase
-        .from("interactions")
-        .select(
-          "id, type, notes, created_at, contacts(id, first_name, last_name, company)",
-        )
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      getSentByCategory(userId),
-    ]);
+  const [
+    assignedRes,
+    interactionsRes,
+    statusRes,
+    recentRes,
+    byCategory,
+    sentRes,
+    interactionsCountRes,
+  ] = await Promise.all([
+    supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+    supabase
+      .from("interactions")
+      .select("contact_id, type, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(ROW_LIMIT),
+    supabase
+      .from("assignments")
+      .select("contacts(id, contact_status(communication_status, updated_at))")
+      .eq("user_id", userId)
+      .limit(ROW_LIMIT),
+    supabase
+      .from("interactions")
+      .select(
+        "id, type, notes, created_at, contacts(id, first_name, last_name, company)",
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(8),
+    getContactedByCategory(userId),
+    supabase
+      .from("emails")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "sent"),
+    // Pravi count, ne .length nad povučenim redovima — taj bi se tiho
+    // zasitio na ROW_LIMIT
+    supabase
+      .from("interactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+  ]);
 
   const interactions = interactionsRes.data ?? [];
 
@@ -176,10 +204,16 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     company: row.contacts?.company ?? null,
   }));
 
+  // Interakcije nemaju kolonu koja razdvaja automatski upis (slanje mejla) od
+  // ručnog evidentiranja, pa se ručni dobijaju oduzimanjem
+  const sentEmails = sentRes.count ?? 0;
+  const interactionsTotal = interactionsCountRes.count ?? interactions.length;
+
   return {
     assignedTotal: assignedRes.count ?? 0,
     contactedCount: contacted.size,
-    interactionsTotal: interactions.length,
+    sentEmails,
+    manualLogs: Math.max(0, interactionsTotal - sentEmails),
     last30Days,
     byType,
     byStatus,

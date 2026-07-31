@@ -63,6 +63,10 @@ U SQL editoru pokreni redom:
 3. `db/email-cron.sql` — cron koji svakog minuta poziva aplikaciju da pošalje
    dospele zakazane mejlove. **Pre pokretanja zameni** `YOUR_APP_URL` i
    `YOUR_CRON_SECRET` u fajlu. Pokreni tek kad je aplikacija deployovana.
+4. `db/follow-up.sql` — statusi za follow up i tabela `app_settings`. Fajl ima
+   dva odeljka koja se pokreću **odvojeno**: prvo dva `alter type`, pa tek onda
+   ostatak. Postgres ne dozvoljava da se nova vrednost enuma upotrebi u istoj
+   transakciji u kojoj je dodata.
 
 Sve skripte su idempotentne.
 
@@ -109,17 +113,54 @@ nalog.
   dok ih cron ne preuzme.
 
 Po uspešnom slanju upisuje se interakcija tipa _Email_, a status kontakta se
-podiže na „Poslato” samo ako je bio „Nije kontaktiran” — bolji ishodi
-(„Dobijen odgovor”, „Prihvaćeno”…) se ne vraćaju unazad.
+pomera za jedan stepenik naviše — nikad unazad:
 
-## 5. Provera i rešavanje problema
+| status pre slanja                  | status posle slanja |
+| ---------------------------------- | ------------------- |
+| prazno / „Nije kontaktiran”        | „Poslato”           |
+| „Poslato” / „Poslati follow up”    | „Poslat follow up”  |
+| „Dobijen odgovor”, „Prihvaćeno”, … | ne menja se         |
+
+## 5. Follow up
+
+Kad prođe zadati broj **radnih dana** od poslednjeg kontaktiranja, a odgovor
+nije evidentiran, kontakt izlazi korisniku na `/mejlovi` u sekciji **Za follow
+up** i dobija status „Poslati follow up”. Status upisuje isti cron koji šalje
+zakazane mejlove (`/api/emails/process`) — nema drugog cron posla.
+
+Kontaktiranje je i mejl poslat iz aplikacije i ručno evidentiranje preko
+**Evidentiraj**; meri se ono što je novije. Ručni unosi se računaju tek od
+`MANUAL_ANCHOR_SINCE` u `lib/follow-up.ts` (datum uvođenja podsetnika) —
+istorija starija od toga se namerno ne budi, inače bi svima odjednom iskočile
+desetine kontakata kontaktiranih pre nego što je tok postojao.
+
+Radni dani su **ponedeljak–četvrtak**; petak, subota i nedelja se ne broje jer
+se tada ne šalju mejlovi. Računa se po beogradskom vremenu, ne po UTC-u.
+Spisak dana je konstanta u `lib/follow-up.ts`; broj dana i uključenost
+podsetnika admin podešava na `/admin/mejlovi`.
+
+Sledeći koraci:
+
+- **Pošalji follow up** otvara kompozer; po slanju status sam prelazi u „Poslat
+  follow up” i kontakt nestaje iz sekcije.
+- Ako ni tada nema odgovora, posle zadatog broja radnih dana kontakt izlazi u
+  sekciji **Za poziv**. Nestaje čim se evidentira interakcija tipa _Poziv_.
+- **Dobijen odgovor** u obe sekcije postavlja taj status i sklanja kontakt.
+
+Aplikacija **ne čita Gmail sanduče** — traži se samo dozvola `gmail.send`.
+Odgovor se zato evidentira ručno. Automatska detekcija bi tražila
+`gmail.readonly`, `thread_id` kolonu na `emails` i ponovnu Google verifikaciju
+(restricted scope).
+
+## 6. Provera i rešavanje problema
 
 Ručno pokretanje obrade zakazanih mejlova (bez čekanja cron-a):
 
 ```bash
 curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
   http://localhost:3000/api/emails/process
-# → {"sent":1,"failed":0,"skipped":0,"swept":0}
+# → {"sent":1,"failed":0,"skipped":0,"swept":0,"promoted":0}
+# promoted = kontakti kojima je upisan status "Poslati follow up"
 ```
 
 U Supabase-u:

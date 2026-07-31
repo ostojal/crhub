@@ -14,6 +14,8 @@ export type Json =
 export type CommunicationStatus =
   | "Nije kontaktiran"
   | "Poslato"
+  | "Poslati follow up"
+  | "Poslat follow up"
   | "Dobijen odgovor"
   | "Na čekanju"
   | "Prihvaćeno"
@@ -53,6 +55,37 @@ export interface Database {
           role?: string | null;
           email_signature?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      // Globalna podešavanja, logički jedan red (db/follow-up.sql)
+      app_settings: {
+        Row: {
+          id: boolean;
+          follow_up_enabled: boolean;
+          follow_up_days: number;
+          call_reminder_enabled: boolean;
+          call_reminder_days: number;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: boolean;
+          follow_up_enabled?: boolean;
+          follow_up_days?: number;
+          call_reminder_enabled?: boolean;
+          call_reminder_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: boolean;
+          follow_up_enabled?: boolean;
+          follow_up_days?: number;
+          call_reminder_enabled?: boolean;
+          call_reminder_days?: number;
+          updated_at?: string;
+          updated_by?: string | null;
         };
         Relationships: [];
       };

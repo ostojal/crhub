@@ -1,14 +1,19 @@
 import { cn } from "@/lib/utils";
 
 // Zaobljeni obojeni okvir oko statusa komunikacije. Boja nosi značenje:
-// zeleno = poslato/prihvaćeno, žuto = na čekanju, sivo = nije kontaktiran,
-// plavo = dobijen odgovor, crveno = odbijeno. Prazan status → "Nije
-// kontaktiran". Čista prezentaciona komponenta — radi i na serveru i na klijentu.
+// zeleno = poslato/prihvaćeno, narandžasto = traži akciju (follow up), žuto =
+// na čekanju, sivo = nije kontaktiran, plavo = dobijen odgovor, crveno =
+// odbijeno. Prazan status → "Nije kontaktiran". Čista prezentaciona
+// komponenta — radi i na serveru i na klijentu.
 const STATUS_STYLES: Record<string, string> = {
   "Nije kontaktiran":
     "border-slate-500/25 bg-slate-500/10 text-slate-600 dark:text-slate-300",
   Poslato:
     "border-green-600/30 bg-green-500/10 text-green-700 dark:text-green-400",
+  "Poslati follow up":
+    "border-orange-600/35 bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  "Poslat follow up":
+    "border-teal-600/30 bg-teal-500/10 text-teal-700 dark:text-teal-400",
   "Dobijen odgovor":
     "border-sky-600/30 bg-sky-500/10 text-sky-700 dark:text-sky-400",
   "Na čekanju":

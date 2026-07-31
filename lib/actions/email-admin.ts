@@ -4,6 +4,8 @@ import {
   ATTACHMENTS_BUCKET,
   MAX_ATTACHMENT_BYTES,
   MAX_BODY_CHARS,
+  MAX_FOLLOW_UP_DAYS,
+  MIN_FOLLOW_UP_DAYS,
 } from "@/lib/constants";
 import { checkRole } from "@/lib/dal";
 import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
@@ -16,6 +18,59 @@ const NO_PERMISSION = "Nemaš dozvolu za ovu akciju.";
 
 function revalidateAdminPaths() {
   revalidatePath("/admin/mejlovi");
+}
+
+// --- Podsetnici za follow up ---
+
+export type FollowUpSettingsInput = {
+  followUpEnabled: boolean;
+  followUpDays: number;
+  callReminderEnabled: boolean;
+  callReminderDays: number;
+};
+
+function isDayCount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= MIN_FOLLOW_UP_DAYS &&
+    value <= MAX_FOLLOW_UP_DAYS
+  );
+}
+
+// Jedan jedini red (db/follow-up.sql), pa update ide bez uslova
+export async function updateFollowUpSettings(
+  input: FollowUpSettingsInput,
+): Promise<ActionResult> {
+  const me = await checkRole("admin");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (!isDayCount(input.followUpDays) || !isDayCount(input.callReminderDays)) {
+    return {
+      ok: false,
+      error: `Broj dana mora biti između ${MIN_FOLLOW_UP_DAYS} i ${MAX_FOLLOW_UP_DAYS}.`,
+    };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("app_settings")
+    .update({
+      follow_up_enabled: !!input.followUpEnabled,
+      follow_up_days: input.followUpDays,
+      call_reminder_enabled: !!input.callReminderEnabled,
+      call_reminder_days: input.callReminderDays,
+      updated_at: new Date().toISOString(),
+      updated_by: me.email,
+    })
+    .eq("id", true);
+
+  if (error) return { ok: false, error: "Greška pri čuvanju podešavanja." };
+
+  revalidateAdminPaths();
+  revalidatePath("/mejlovi");
+
+  return { ok: true, message: "Podešavanja su sačuvana." };
 }
 
 // --- Šabloni mejlova ---

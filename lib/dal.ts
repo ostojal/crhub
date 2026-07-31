@@ -70,6 +70,27 @@ export async function checkRole(...roles: Role[]): Promise<CurrentUser | null> {
   return user;
 }
 
+// Isto pravilo kao requireContactAccess, ali bez redirecta — za server akcije,
+// koje odgovaraju porukom umesto da preusmeravaju. Za više kontakata odjednom
+// vidi grupnu proveru u lib/actions/interactions.ts (jedan upit umesto N).
+export async function hasContactAccess(
+  user: CurrentUser,
+  contactId: number,
+): Promise<boolean> {
+  if (user.role === "admin") return true;
+
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("assignments")
+    .select("id")
+    .eq("contact_id", contactId)
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  return !!data;
+}
+
 // Admin sme svaki kontakt; user samo kontakt koji mu je dodeljen
 export async function requireContactAccess(
   contactId: number,

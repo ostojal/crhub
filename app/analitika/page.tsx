@@ -2,7 +2,7 @@ import { UserStatsView } from "@/components/analytics/user-stats";
 import { UsersSummaryTable } from "@/components/analytics/users-summary-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getSentByCategory,
+  getContactedByCategory,
   getUserStats,
   getUsersSummary,
 } from "@/lib/analytics";
@@ -70,10 +70,10 @@ export default async function AnalyticsPage({
 
   const [rows, byCategory] = await Promise.all([
     getUsersSummary(),
-    getSentByCategory(),
+    getContactedByCategory(),
   ]);
 
-  const sentTotal = byCategory.reduce((sum, item) => sum + item.count, 0);
+  const contactedTotal = byCategory.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
@@ -85,10 +85,10 @@ export default async function AnalyticsPage({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Poslati mejlovi po kategoriji partnera</CardTitle>
+          <CardTitle>Kontaktirani partneri po kategoriji</CardTitle>
         </CardHeader>
         <CardContent>
-          {sentTotal === 0 ? (
+          {contactedTotal === 0 ? (
             <p className="text-sm text-muted-foreground">
               Još nije poslat nijedan mejl iz aplikacije.
             </p>

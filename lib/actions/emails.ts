@@ -6,7 +6,7 @@ import {
   MAX_SIGNATURE_CHARS,
   MAX_TOTAL_ATTACHMENT_BYTES,
 } from "@/lib/constants";
-import { checkRole, type CurrentUser } from "@/lib/dal";
+import { checkRole, hasContactAccess } from "@/lib/dal";
 import type { Database } from "@/lib/database.types";
 import { decryptSecret } from "@/lib/email/crypto";
 import { revokeRefreshToken } from "@/lib/email/google";
@@ -23,26 +23,6 @@ const MAX_RECIPIENTS = 20;
 const MAX_ATTACHMENTS = 10;
 
 type Client = SupabaseClient<Database>;
-
-// Isto pravilo kao kod evidentiranja: admin sme svaki kontakt, user samo one
-// koji su mu dodeljeni (vidi logInteractions u lib/actions/interactions.ts)
-async function hasContactAccess(
-  supabase: Client,
-  me: CurrentUser,
-  contactId: number,
-): Promise<boolean> {
-  if (me.role === "admin") return true;
-
-  const { data } = await supabase
-    .from("assignments")
-    .select("id")
-    .eq("contact_id", contactId)
-    .eq("user_id", me.id)
-    .limit(1)
-    .maybeSingle();
-
-  return !!data;
-}
 
 function revalidateEmailPaths(contactId: number) {
   revalidatePath("/mejlovi");
@@ -88,7 +68,7 @@ export async function getComposeContext(
   if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
   const supabase = createClient();
-  if (!(await hasContactAccess(supabase, me, contactId))) {
+  if (!(await hasContactAccess(me, contactId))) {
     return { ok: false, error: NO_PERMISSION };
   }
 
@@ -290,7 +270,7 @@ export async function composeEmail(
   if (!isId(input.contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
   const supabase = createClient();
-  if (!(await hasContactAccess(supabase, me, input.contactId))) {
+  if (!(await hasContactAccess(me, input.contactId))) {
     return { ok: false, error: NO_PERMISSION };
   }
 

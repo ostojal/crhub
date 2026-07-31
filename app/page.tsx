@@ -109,7 +109,8 @@ async function AdminDashboard() {
   const tiles = [
     { label: "Ukupno kontakata", value: contactsRes.count ?? 0 },
     { label: "Dodeljeno kontakata", value: assignedRes.count ?? 0 },
-    { label: "Ukupno interakcija", value: interactionsTotal },
+    // Zbir mejlova poslatih iz aplikacije i ručno evidentiranih kontaktiranja
+    { label: "Kontaktiranja (mejlovi + ručno)", value: interactionsTotal },
     { label: "Korisnika u timu", value: rows.length },
   ];
 
