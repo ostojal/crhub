@@ -21,6 +21,7 @@ export type MyContact = {
   mobile_phone: string | null;
   city: string | null;
   category: string | null;
+  notes: string | null;
   contact_status: {
     communication_status: string | null;
     interest_tag: string | null;
@@ -133,6 +134,23 @@ export function buildMyContactColumns({
       id: "assigned_at",
       accessorFn: (row) => format(row.assigned_at, "dd.MM.yyyy."),
       header: "Dodeljeno",
+    },
+    {
+      id: "notes",
+      accessorKey: "notes",
+      header: "Beleška",
+      // Ceo tekst stoji u profilu kontakta; ovde samo početak, da red ostane
+      // jednolinijski
+      cell: ({ getValue }) => {
+        const value = getValue<string | null>();
+        if (!value) return <span className="text-muted-foreground">-</span>;
+
+        return (
+          <span className="block max-w-56 truncate" title={value}>
+            {value}
+          </span>
+        );
+      },
     },
     {
       id: "actions",

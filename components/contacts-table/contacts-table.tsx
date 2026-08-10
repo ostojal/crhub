@@ -210,6 +210,13 @@ function ContactMobileCard({
           </MobileField>
         )}
         <MobileField label="Dodeljeno">{assignee ?? "—"}</MobileField>
+        {isAdmin && contact.notes && (
+          <MobileField label="Beleška">
+            <span className="whitespace-pre-wrap normal-case">
+              {contact.notes}
+            </span>
+          </MobileField>
+        )}
       </div>
     </MobileCard>
   );

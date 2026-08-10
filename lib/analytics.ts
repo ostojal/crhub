@@ -4,8 +4,11 @@ import {
   COMMUNICATION_STATUSES,
   CONTACT_CATEGORIES,
   CONTACT_CATEGORY_LABELS,
+  CONTACT_TYPES,
   INTERACTION_TYPE_LABELS,
   INTERACTION_TYPES,
+  NOTE_TYPE,
+  NOT_NOTE_FILTER,
   NO_CATEGORY_LABEL,
 } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
@@ -152,7 +155,8 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     supabase
       .from("interactions")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
+      .eq("user_id", userId)
+      .or(NOT_NOTE_FILTER),
     // Za follow up-ove treba i broj različitih kontakata kojima je slato, pa
     // ovde idu redovi, ne count
     supabase
@@ -172,6 +176,10 @@ export async function getUserStats(userId: number): Promise<UserStats> {
   const cutoff = Date.now() - THIRTY_DAYS_MS;
 
   for (const interaction of interactions) {
+    // Beleška nije kontaktiranje — vidi se u istoriji kontakta, ali ne ulazi
+    // ni u jednu brojku ovde
+    if (interaction.type === NOTE_TYPE) continue;
+
     if (interaction.contact_id !== null) contacted.add(interaction.contact_id);
 
     const label = interactionTypeLabel(interaction.type);
@@ -181,7 +189,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
   }
 
   // Fiksni redosled tipova iz konstanti, pa eventualni nepoznati tipovi
-  const byType: CountItem[] = INTERACTION_TYPES.map((type) => ({
+  const byType: CountItem[] = CONTACT_TYPES.map((type) => ({
     label: INTERACTION_TYPE_LABELS[type],
     count: byTypeMap.get(INTERACTION_TYPE_LABELS[type]) ?? 0,
   }));
@@ -270,7 +278,7 @@ export async function getUsersSummary(): Promise<UserSummaryRow[]> {
       supabase.from("assignments").select("user_id").limit(ROW_LIMIT),
       supabase
         .from("interactions")
-        .select("user_id, contact_id, created_at")
+        .select("user_id, contact_id, type, created_at")
         .order("created_at", { ascending: false })
         .limit(ROW_LIMIT),
       supabase
@@ -291,6 +299,9 @@ export async function getUsersSummary(): Promise<UserSummaryRow[]> {
   const lastActivityByUser = new Map<number, string>();
   for (const row of interactionsRes.data ?? []) {
     if (row.user_id === null) continue;
+    // Beleška nije kontaktiranje, pa ne ulazi ni u "Kontaktirano" ni u
+    // "Poslednja aktivnost" — obe kolone govore o kontaktiranju
+    if (row.type === NOTE_TYPE) continue;
 
     if (row.contact_id !== null) {
       const set = contactedByUser.get(row.user_id) ?? new Set<number>();

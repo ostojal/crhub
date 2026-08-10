@@ -158,18 +158,16 @@ export function ContactActions({
               </DropdownMenuItem>
             )}
 
-            {contact.notes && (
-              <NotesDialog contact={contact}>
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                  }}
-                >
-                  <NotebookIcon />
-                  Prikaži note
-                </DropdownMenuItem>
-              </NotesDialog>
-            )}
+            <NotesDialog contact={contact}>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                <NotebookIcon />
+                {contact.notes ? "Prikaži belešku" : "Dodaj belešku"}
+              </DropdownMenuItem>
+            </NotesDialog>
 
             <DropdownMenuSeparator />
 

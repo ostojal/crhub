@@ -34,7 +34,12 @@ export const CONTACT_CATEGORY_LABELS: Record<ContactCategory, string> = {
 
 export const NO_CATEGORY_LABEL = "Bez kategorije";
 
-export const INTERACTION_TYPES = ["email", "poziv", "linkedin"] as const;
+export const INTERACTION_TYPES = [
+  "email",
+  "poziv",
+  "linkedin",
+  "beleska",
+] as const;
 
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
 
@@ -42,7 +47,22 @@ export const INTERACTION_TYPE_LABELS: Record<InteractionType, string> = {
   email: "Email",
   poziv: "Poziv",
   linkedin: "LinkedIn",
+  beleska: "Beleška",
 };
+
+// Beleška stoji u istoriji kontakta, ali nije kontaktiranje: ne ulazi ni u
+// jednu brojku u analitici, ne pomera status i ne pokreće follow up.
+// Kolona `interactions.type` je običan tekst (bez check ograničenja), pa novi
+// tip ne traži izmenu baze.
+export const NOTE_TYPE = "beleska";
+
+export const CONTACT_TYPES = INTERACTION_TYPES.filter(
+  (type) => type !== NOTE_TYPE,
+);
+
+// PostgREST filter za "sve osim beleške"; redovi bez tipa se zadržavaju, jer
+// bi ih `neq` (NULL != 'beleska' → NULL) tiho izbacio
+export const NOT_NOTE_FILTER = `type.is.null,type.neq.${NOTE_TYPE}`;
 
 // Vrednosti Postgres enuma `public.status` — moraju se poklapati sa bazom
 // (db/follow-up.sql). Redosled vodi padajuće liste i redosled u analitici.

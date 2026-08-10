@@ -123,6 +123,11 @@ export function MyContactsView({ contacts }: { contacts: MyContact[] }) {
           <MobileField label="Dodeljeno">
             {format(contact.assigned_at, "dd.MM.yyyy.")}
           </MobileField>
+          {contact.notes && (
+            <MobileField label="Beleška">
+              <span className="whitespace-pre-wrap">{contact.notes}</span>
+            </MobileField>
+          )}
         </div>
 
         <div className="flex gap-2">

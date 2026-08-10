@@ -27,18 +27,16 @@ export function NotesDialog({
   contact,
   children,
 }: NotesDialogProps) {
-  const [editing, setEditing] = useState(false);
-
-  // Bez beleške nema šta da se prikaže, ali u edit režimu može da se doda
-  if (!contact.notes && !defaultEditing) {
-    return null;
-  }
+  // Kad beleške još nema, dijalog se otvara pravo u režimu pisanja — inače
+  // prva beleška ne bi mogla da se doda
+  const startsEditing = defaultEditing || !contact.notes;
+  const [editing, setEditing] = useState(startsEditing);
 
   return (
     <Dialog
       onOpenChange={(open) => {
         if (open) {
-          setEditing(defaultEditing ?? false);
+          setEditing(startsEditing);
         }
       }}
     >
@@ -46,7 +44,7 @@ export function NotesDialog({
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{contactName(contact)} - Notes</DialogTitle>
+          <DialogTitle>{contactName(contact)} — beleška</DialogTitle>
         </DialogHeader>
 
         <form
@@ -73,6 +71,8 @@ export function NotesDialog({
               spellCheck="false"
               defaultValue={contact.notes ?? ""}
               name="note"
+              rows={5}
+              placeholder="Trajna napomena o kontaktu..."
             />
           )}
 
@@ -96,8 +96,12 @@ export function NotesDialog({
 
           {!editing && (
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                Promeni Note
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditing(true)}
+              >
+                Izmeni belešku
               </Button>
             </DialogFooter>
           )}

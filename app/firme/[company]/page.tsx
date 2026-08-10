@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { NOT_NOTE_FILTER } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { formatPhoneNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +55,9 @@ export default async function CompanyPage({
         "id, first_name, last_name, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at), assignments(users(full_name)), interactions(count)",
       )
       .eq("company", company)
+      // Beleške se ne broje u "Kontaktiran" — filter ide nad ugnežđenim
+      // redovima, pa i count broji samo stvarna kontaktiranja
+      .or(NOT_NOTE_FILTER, { referencedTable: "interactions" })
       .order("updated_at", {
         referencedTable: "contact_status",
         ascending: false,

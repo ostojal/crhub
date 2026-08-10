@@ -235,6 +235,23 @@ export function buildContactColumns({
         />
       ),
     },
+    {
+      id: "notes",
+      accessorKey: "notes",
+      header: "Beleška",
+      // Beleška ume da bude dugačka, pa red ostaje jednolinijski, a ceo tekst
+      // se vidi u profilu kontakta ili kroz "Prikaži belešku" u meniju reda
+      cell: ({ getValue }) => {
+        const value = getValue<string | null>();
+        if (!value) return <span className="text-muted-foreground">-</span>;
+
+        return (
+          <span className="block max-w-56 truncate normal-case" title={value}>
+            {value}
+          </span>
+        );
+      },
+    },
     assignee,
     actions,
   ];
@@ -258,6 +275,8 @@ export function columnIdToLabel(columnId: string) {
       return "Dodato";
     case "contact_status":
       return "Status";
+    case "notes":
+      return "Beleška";
     case "assignee":
       return "Dodeljeno";
     default:

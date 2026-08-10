@@ -48,7 +48,7 @@ export default async function ContactDetailPage({
         .maybeSingle(),
       supabase
         .from("interactions")
-        .select("id, type, notes, created_at, users(full_name, email)")
+        .select("id, user_id, type, notes, created_at, users(full_name, email)")
         .eq("contact_id", contactId)
         .order("created_at", { ascending: false })
         .limit(100),
@@ -200,13 +200,24 @@ export default async function ContactDetailPage({
                   </dd>
                 </div>
               ))}
-              {contact.notes && (
-                <div>
-                  <dt className="text-muted-foreground">Beleške</dt>
-                  <dd className="mt-1 whitespace-pre-wrap">{contact.notes}</dd>
-                </div>
-              )}
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="md:order-first md:col-span-2">
+          <CardHeader>
+            <CardTitle>Beleška</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {contact.notes ? (
+              <p className="text-sm whitespace-pre-wrap">{contact.notes}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {me.role === "admin"
+                  ? "Nema beleške. Dodaje se kroz „Promeni info” ili iz menija reda u tabeli kontakata."
+                  : "Nema beleške."}
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -215,7 +226,12 @@ export default async function ContactDetailPage({
             <CardTitle>Istorija kontaktiranja</CardTitle>
           </CardHeader>
           <CardContent>
-            <InteractionsList interactions={interactions ?? []} />
+            {/* Isto pravilo koje primenjuju same akcije: admin sve, ostali
+                samo svoje unose */}
+            <InteractionsList
+              interactions={interactions ?? []}
+              canEditId={me.role === "admin" ? "all" : me.id}
+            />
           </CardContent>
         </Card>
 

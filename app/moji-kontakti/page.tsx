@@ -16,7 +16,7 @@ export default async function MyContactsPage() {
   const { data: assignments, error } = await supabase
     .from("assignments")
     .select(
-      "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, category, contact_status(communication_status, interest_tag, updated_at))",
+      "assigned_at, contacts(id, first_name, last_name, company, job_title, email, phone, mobile_phone, city, category, notes, contact_status(communication_status, interest_tag, updated_at))",
     )
     .eq("user_id", me.id)
     .order("assigned_at", { ascending: false })

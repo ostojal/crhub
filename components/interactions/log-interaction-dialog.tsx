@@ -25,6 +25,7 @@ import {
   INTERACTION_TYPE_LABELS,
   INTERACTION_TYPES,
   INTEREST_TAGS,
+  NOTE_TYPE,
 } from "@/lib/constants";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -52,6 +53,9 @@ export function LogInteractionDialog({
   const [isPending, startTransition] = useTransition();
 
   const isBulk = contacts.length > 1;
+  // Beleška nije kontaktiranje: ne menja status ni oznaku interesovanja, pa
+  // se ta polja i ne prikazuju
+  const isNote = type === NOTE_TYPE;
 
   const handleSubmit = () => {
     startTransition(async () => {
@@ -79,9 +83,13 @@ export function LogInteractionDialog({
       <DialogContent className="max-h-[90svh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isBulk
-              ? `Evidentiraj kontaktiranje (${contacts.length})`
-              : "Evidentiraj kontaktiranje"}
+            {isNote
+              ? isBulk
+                ? `Dodaj belešku (${contacts.length})`
+                : "Dodaj belešku"
+              : isBulk
+                ? `Evidentiraj kontaktiranje (${contacts.length})`
+                : "Evidentiraj kontaktiranje"}
           </DialogTitle>
           <DialogDescription>
             {isBulk ? (
@@ -112,27 +120,36 @@ export function LogInteractionDialog({
             </Select>
           </div>
 
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">
-              Novi status kontakta
-            </legend>
-            {COMMUNICATION_STATUSES.map((s) => (
-              <label key={s} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="interaction-status"
-                  value={s}
-                  checked={status === s}
-                  onChange={() => setStatus(s)}
-                  className="accent-primary"
-                />
-                {s}
-              </label>
-            ))}
-          </fieldset>
+          {isNote ? (
+            <p className="text-sm text-muted-foreground">
+              Beleška se upisuje u istoriju kontakta, ali se ne broji kao
+              kontaktiranje i ne menja status.
+            </p>
+          ) : (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                Novi status kontakta
+              </legend>
+              {COMMUNICATION_STATUSES.map((s) => (
+                <label key={s} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="interaction-status"
+                    value={s}
+                    checked={status === s}
+                    onChange={() => setStatus(s)}
+                    className="accent-primary"
+                  />
+                  {s}
+                </label>
+              ))}
+            </fieldset>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="interaction-notes">Beleške</Label>
+            <Label htmlFor="interaction-notes">
+              {isNote ? "Beleška" : "Beleške"}
+            </Label>
             <Textarea
               id="interaction-notes"
               value={notes}
@@ -142,22 +159,24 @@ export function LogInteractionDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="interaction-tag">Oznaka interesovanja</Label>
-            <Select value={tag} onValueChange={setTag}>
-              <SelectTrigger id="interaction-tag" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_CHANGE}>{""}</SelectItem>
-                {INTEREST_TAGS.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isNote && (
+            <div className="space-y-2">
+              <Label htmlFor="interaction-tag">Oznaka interesovanja</Label>
+              <Select value={tag} onValueChange={setTag}>
+                <SelectTrigger id="interaction-tag" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CHANGE}>{""}</SelectItem>
+                  {INTEREST_TAGS.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -166,7 +185,10 @@ export function LogInteractionDialog({
               Otkaži
             </Button>
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={isPending}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isPending || (isNote && notes.trim() === "")}
+          >
             {isPending ? "Čuvanje..." : "Sačuvaj"}
           </Button>
         </DialogFooter>

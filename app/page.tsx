@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getUserStats, getUsersSummary } from "@/lib/analytics";
-import { ROLE_LABELS } from "@/lib/constants";
+import { NOT_NOTE_FILTER, ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
 import { createClient } from "@/lib/supabase/server";
@@ -100,8 +100,12 @@ async function AdminDashboard() {
     supabase.from("contacts").select("id", { count: "exact", head: true }),
     supabase.from("assignments").select("id", { count: "exact", head: true }),
     // Pravi count nad celom tabelom — tabela ispod prikazuje različite
-    // kontakte po korisniku, pa se njihovim sabiranjem ovaj broj ne dobija
-    supabase.from("interactions").select("id", { count: "exact", head: true }),
+    // kontakte po korisniku, pa se njihovim sabiranjem ovaj broj ne dobija.
+    // Beleške nisu kontaktiranje, pa ispadaju.
+    supabase
+      .from("interactions")
+      .select("id", { count: "exact", head: true })
+      .or(NOT_NOTE_FILTER),
   ]);
 
   const tiles = [

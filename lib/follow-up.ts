@@ -1,5 +1,6 @@
 import "server-only";
 
+import { NOT_NOTE_FILTER } from "@/lib/constants";
 import { setContactStatus } from "@/lib/contact-status";
 import type { CurrentUser } from "@/lib/dal";
 import type { CommunicationStatus, Database } from "@/lib/database.types";
@@ -180,10 +181,12 @@ async function loadLastContacts(
     .order("sent_at", { ascending: false })
     .limit(ROW_LIMIT);
 
+  // Beleška nije kontaktiranje, pa ne pomera rok za follow up
   const interactions = supabase
     .from("interactions")
     .select(`contact_id, created_at, ${CONTACT_SELECT}`)
     .not("contact_id", "is", null)
+    .or(NOT_NOTE_FILTER)
     .gte("created_at", MANUAL_ANCHOR_SINCE)
     .order("created_at", { ascending: false })
     .limit(ROW_LIMIT);

@@ -4,6 +4,7 @@ import {
   COMMUNICATION_STATUSES,
   INTERACTION_TYPES,
   INTEREST_TAGS,
+  NOTE_TYPE,
 } from "@/lib/constants";
 import { setContactStatus } from "@/lib/contact-status";
 import { checkRole } from "@/lib/dal";
@@ -44,12 +45,15 @@ export async function logInteractions(
     return { ok: false, error: "Nepoznat tip kontaktiranja." };
   }
 
-  const newStatus = input.newStatus;
+  // Beleška ne menja status ni oznaku, pa i kad ih klijent pošalje — otpadaju
+  const isNote = input.type === NOTE_TYPE;
+
+  const newStatus = isNote ? undefined : input.newStatus;
   if (newStatus !== undefined && !isOneOf(newStatus, COMMUNICATION_STATUSES)) {
     return { ok: false, error: "Nepoznat status." };
   }
 
-  const interestTag = input.interestTag;
+  const interestTag = isNote ? undefined : input.interestTag;
   if (interestTag !== undefined && !isOneOf(interestTag, INTEREST_TAGS)) {
     return { ok: false, error: "Nepoznata oznaka." };
   }
@@ -117,9 +121,102 @@ export async function logInteractions(
 
   return {
     ok: true,
-    message:
-      contactIds.length === 1
+    message: isNote
+      ? contactIds.length === 1
+        ? "Beleška je sačuvana."
+        : `Sačuvano beleški: ${contactIds.length}.`
+      : contactIds.length === 1
         ? "Kontaktiranje je evidentirano."
         : `Evidentirano kontaktiranja: ${contactIds.length}.`,
   };
+}
+
+// Naknadno razvrstavanje: red upisan kao kontaktiranje zapravo je bio beleška
+// (ili obrnuto). Menja samo tip — beleške, vreme i autor ostaju.
+export async function setInteractionType(
+  interactionId: number,
+  type: string,
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (!isId(interactionId)) return { ok: false, error: "Nepoznat unos." };
+  if (!isOneOf(type, INTERACTION_TYPES)) {
+    return { ok: false, error: "Nepoznat tip kontaktiranja." };
+  }
+
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("interactions")
+    .select("id, user_id, contact_id")
+    .eq("id", interactionId)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Unos ne postoji." };
+
+  // Tuđe unose menja samo admin
+  if (me.role !== "admin" && existing.user_id !== me.id) {
+    return { ok: false, error: NO_PERMISSION };
+  }
+
+  const { error } = await supabase
+    .from("interactions")
+    .update({ type })
+    .eq("id", interactionId);
+
+  if (error) return { ok: false, error: "Greška pri izmeni unosa." };
+
+  revalidateInteractionPaths(existing.contact_id);
+
+  return {
+    ok: true,
+    message:
+      type === NOTE_TYPE
+        ? "Unos je prebačen u beleške."
+        : "Tip unosa je izmenjen.",
+  };
+}
+
+export async function deleteInteraction(
+  interactionId: number,
+): Promise<ActionResult> {
+  const me = await checkRole("admin", "user");
+  if (!me) return { ok: false, error: NO_PERMISSION };
+
+  if (!isId(interactionId)) return { ok: false, error: "Nepoznat unos." };
+
+  const supabase = createClient();
+
+  const { data: existing } = await supabase
+    .from("interactions")
+    .select("id, user_id, contact_id")
+    .eq("id", interactionId)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Unos ne postoji." };
+
+  if (me.role !== "admin" && existing.user_id !== me.id) {
+    return { ok: false, error: NO_PERMISSION };
+  }
+
+  const { error } = await supabase
+    .from("interactions")
+    .delete()
+    .eq("id", interactionId);
+
+  if (error) return { ok: false, error: "Greška pri brisanju unosa." };
+
+  revalidateInteractionPaths(existing.contact_id);
+
+  return { ok: true, message: "Unos je obrisan." };
+}
+
+function revalidateInteractionPaths(contactId: number | null): void {
+  revalidatePath("/");
+  revalidatePath("/contacts");
+  if (contactId !== null) revalidatePath(`/contacts/${contactId}`);
+  revalidatePath("/moji-kontakti");
+  revalidatePath("/analitika");
+  revalidatePath("/firme/[company]", "page");
 }
