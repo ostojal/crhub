@@ -32,8 +32,8 @@ export function UsersSummaryTable({ rows }: { rows: UserSummaryRow[] }) {
                 <MobileField label="Kontaktirano">
                   <span className="tabular-nums">{row.contacted}</span>
                 </MobileField>
-                <MobileField label="Interakcije">
-                  <span className="tabular-nums">{row.interactions}</span>
+                <MobileField label="Poslato follow-upova">
+                  <span className="tabular-nums">{row.followUpsSent}</span>
                 </MobileField>
                 <MobileField label="Poslednja aktivnost">
                   {row.lastActivity
@@ -57,7 +57,9 @@ export function UsersSummaryTable({ rows }: { rows: UserSummaryRow[] }) {
               <TableHead className="px-4">Korisnik</TableHead>
               <TableHead className="px-4 text-right">Dodeljeno</TableHead>
               <TableHead className="px-4 text-right">Kontaktirano</TableHead>
-              <TableHead className="px-4 text-right">Interakcije</TableHead>
+              <TableHead className="px-4 text-right">
+                Poslato follow-upova
+              </TableHead>
               <TableHead className="px-4">Poslednja aktivnost</TableHead>
               <TableHead className="px-4 text-right">
                 <span className="sr-only">Detalji</span>
@@ -76,7 +78,7 @@ export function UsersSummaryTable({ rows }: { rows: UserSummaryRow[] }) {
                     {row.contacted}
                   </TableCell>
                   <TableCell className="px-4 text-right tabular-nums">
-                    {row.interactions}
+                    {row.followUpsSent}
                   </TableCell>
                   <TableCell className="px-4">
                     {row.lastActivity ? (

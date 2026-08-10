@@ -1,21 +1,20 @@
-import { Badge } from "@/components/ui/badge";
+import { RecentInteractionsCard } from "@/components/analytics/recent-interactions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CountItem, UserStats } from "@/lib/analytics";
-import { format } from "date-fns";
-import Link from "next/link";
 
 export function UserStatsView({ stats }: { stats: UserStats }) {
   const tiles = [
     { label: "Dodeljeni kontakti", value: stats.assignedTotal },
     { label: "Kontaktirano (različitih)", value: stats.contactedCount },
     { label: "Poslati mejlovi (iz aplikacije)", value: stats.sentEmails },
+    { label: "Poslato follow-upova", value: stats.followUpsSent },
     { label: "Ručno evidentirano", value: stats.manualLogs },
     { label: "Poslednjih 30 dana", value: stats.last30Days },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
         {tiles.map((tile) => (
           <Card key={tile.label} size="sm">
             <CardHeader className="pb-2">
@@ -44,51 +43,7 @@ export function UserStatsView({ stats }: { stats: UserStats }) {
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Poslednje interakcije</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {stats.recent.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Još nema evidentiranih kontaktiranja.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {stats.recent.map((interaction) => (
-                <li
-                  key={interaction.id}
-                  className="flex flex-wrap items-baseline gap-2 text-sm"
-                >
-                  <span className="text-muted-foreground tabular-nums">
-                    {format(interaction.created_at, "dd.MM.yyyy. HH:mm")}
-                  </span>
-                  {interaction.contactId ? (
-                    <Link
-                      href={`/contacts/${interaction.contactId}`}
-                      className="font-medium underline-offset-4 hover:underline"
-                    >
-                      {interaction.contactName}
-                    </Link>
-                  ) : (
-                    <span className="font-medium">
-                      {interaction.contactName}
-                    </span>
-                  )}
-                  {interaction.company && (
-                    <span className="text-muted-foreground">
-                      ({interaction.company})
-                    </span>
-                  )}
-                  <Badge variant="secondary">
-                    {interaction.type || "Nepoznato"}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <RecentInteractionsCard interactions={stats.recent} />
     </div>
   );
 }

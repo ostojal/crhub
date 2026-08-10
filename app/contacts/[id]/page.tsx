@@ -1,10 +1,15 @@
 import { ContactAdminActions } from "@/components/contacts/contact-admin-actions";
 import { CopyButton } from "@/components/copy-button";
 import { ContactButtons } from "@/components/email/contact-buttons";
+import {
+  ContactEmailsList,
+  type ContactEmailItem,
+} from "@/components/email/contact-emails-list";
 import { InteractionsList } from "@/components/interactions/interactions-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { EmailStatus } from "@/lib/constants";
 import { requireContactAccess } from "@/lib/dal";
 import { formatPhoneNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -27,26 +32,36 @@ export default async function ContactDetailPage({
   // Provera pristupa i podaci idu istim kruženjem do baze — svi znaju
   // contactId. Kad pristupa nema, requireContactAccess preusmerava i render
   // nikad ne stigne do dohvaćenih redova.
-  const [me, { data: contact }, { data: interactions }] = await Promise.all([
-    requireContactAccess(contactId),
-    supabase
-      .from("contacts")
-      .select(
-        "*, contact_status(communication_status, interest_tag, updated_at), assignments(assigned_at, users(id, full_name, email))",
-      )
-      .eq("id", contactId)
-      .order("updated_at", {
-        referencedTable: "contact_status",
-        ascending: false,
-      })
-      .maybeSingle(),
-    supabase
-      .from("interactions")
-      .select("id, type, notes, created_at, users(full_name, email)")
-      .eq("contact_id", contactId)
-      .order("created_at", { ascending: false })
-      .limit(100),
-  ]);
+  const [me, { data: contact }, { data: interactions }, { data: emails }] =
+    await Promise.all([
+      requireContactAccess(contactId),
+      supabase
+        .from("contacts")
+        .select(
+          "*, contact_status(communication_status, interest_tag, updated_at), assignments(assigned_at, users(id, full_name, email))",
+        )
+        .eq("id", contactId)
+        .order("updated_at", {
+          referencedTable: "contact_status",
+          ascending: false,
+        })
+        .maybeSingle(),
+      supabase
+        .from("interactions")
+        .select("id, type, notes, created_at, users(full_name, email)")
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      // Samo zaglavlja; telo mejla se učitava na klik (getEmailDetails)
+      supabase
+        .from("emails")
+        .select(
+          "id, user_id, subject, status, scheduled_at, sent_at, users(full_name, email)",
+        )
+        .eq("contact_id", contactId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
 
   if (!contact) notFound();
 
@@ -56,6 +71,18 @@ export default async function ContactDetailPage({
   const assignment = contact.assignments[0] ?? null;
   const assigneeName =
     assignment?.users?.full_name || assignment?.users?.email || null;
+
+  const emailItems: ContactEmailItem[] = (emails ?? []).map((email) => ({
+    id: email.id,
+    subject: email.subject,
+    status: email.status as EmailStatus,
+    scheduled_at: email.scheduled_at,
+    sent_at: email.sent_at,
+    senderName: email.users?.full_name || email.users?.email || "—",
+    // Isto pravilo koje primenjuje getEmailDetails — bez ovoga bi dugme
+    // "Prikaži" stajalo i na tuđim mejlovima, samo da vrati grešku
+    canOpen: me.role === "admin" || email.user_id === me.id,
+  }));
 
   const backHref = me.role === "user" ? "/moji-kontakti" : "/contacts";
   const backLabel = me.role === "user" ? "Moji kontakti" : "Kontakti";
@@ -189,6 +216,15 @@ export default async function ContactDetailPage({
           </CardHeader>
           <CardContent>
             <InteractionsList interactions={interactions ?? []} />
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Mejlovi</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ContactEmailsList emails={emailItems} />
           </CardContent>
         </Card>
       </div>

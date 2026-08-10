@@ -95,22 +95,23 @@ async function UserDashboard({ userId }: { userId: number }) {
 async function AdminDashboard() {
   const supabase = createClient();
 
-  const [rows, contactsRes, assignedRes] = await Promise.all([
+  const [rows, contactsRes, assignedRes, interactionsRes] = await Promise.all([
     getUsersSummary(),
     supabase.from("contacts").select("id", { count: "exact", head: true }),
     supabase.from("assignments").select("id", { count: "exact", head: true }),
+    // Pravi count nad celom tabelom — tabela ispod prikazuje različite
+    // kontakte po korisniku, pa se njihovim sabiranjem ovaj broj ne dobija
+    supabase.from("interactions").select("id", { count: "exact", head: true }),
   ]);
-
-  const interactionsTotal = rows.reduce(
-    (sum, row) => sum + row.interactions,
-    0,
-  );
 
   const tiles = [
     { label: "Ukupno kontakata", value: contactsRes.count ?? 0 },
     { label: "Dodeljeno kontakata", value: assignedRes.count ?? 0 },
     // Zbir mejlova poslatih iz aplikacije i ručno evidentiranih kontaktiranja
-    { label: "Kontaktiranja (mejlovi + ručno)", value: interactionsTotal },
+    {
+      label: "Kontaktiranja (mejlovi + ručno)",
+      value: interactionsRes.count ?? 0,
+    },
     { label: "Korisnika u timu", value: rows.length },
   ];
 

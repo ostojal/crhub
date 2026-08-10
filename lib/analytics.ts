@@ -30,12 +30,17 @@ export type RecentInteraction = {
   company: string | null;
 };
 
+// Poslednje interakcije se učitavaju sve (do granice), a stranica prikazuje
+// prvih nekoliko dok korisnik ne zatraži ceo spisak
+const RECENT_INTERACTIONS_LIMIT = 500;
+
 export type UserStats = {
   assignedTotal: number;
   contactedCount: number;
   // Mejlovi poslati iz aplikacije i ručno evidentirana kontaktiranja stoje
   // odvojeno: zbir bi bio veći od broja kontakata i delovao kao greška
   sentEmails: number;
+  followUpsSent: number;
   manualLogs: number;
   last30Days: number;
   byType: CountItem[];
@@ -111,6 +116,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     byCategory,
     sentRes,
     interactionsCountRes,
+    sentEmailsRes,
   ] = await Promise.all([
     supabase
       .from("assignments")
@@ -134,7 +140,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(RECENT_INTERACTIONS_LIMIT),
     getContactedByCategory(userId),
     supabase
       .from("emails")
@@ -147,6 +153,15 @@ export async function getUserStats(userId: number): Promise<UserStats> {
       .from("interactions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId),
+    // Za follow up-ove treba i broj različitih kontakata kojima je slato, pa
+    // ovde idu redovi, ne count
+    supabase
+      .from("emails")
+      .select("contact_id")
+      .eq("user_id", userId)
+      .eq("status", "sent")
+      .not("contact_id", "is", null)
+      .limit(ROW_LIMIT),
   ]);
 
   const interactions = interactionsRes.data ?? [];
@@ -209,10 +224,18 @@ export async function getUserStats(userId: number): Promise<UserStats> {
   const sentEmails = sentRes.count ?? 0;
   const interactionsTotal = interactionsCountRes.count ?? interactions.length;
 
+  // Isto pravilo kao u getUsersSummary i lib/email/send.ts: drugi mejl istom
+  // kontaktu jeste follow up
+  const sentRows = sentEmailsRes.data ?? [];
+  const emailedContacts = new Set(
+    sentRows.map((row) => row.contact_id).filter((id) => id !== null),
+  );
+
   return {
     assignedTotal: assignedRes.count ?? 0,
     contactedCount: contacted.size,
     sentEmails,
+    followUpsSent: Math.max(0, sentRows.length - emailedContacts.size),
     manualLogs: Math.max(0, interactionsTotal - sentEmails),
     last30Days,
     byType,
@@ -226,27 +249,37 @@ export type UserSummaryRow = {
   userId: number;
   name: string;
   assigned: number;
+  // Različiti kontakti koje je korisnik dodirnuo — mejlom iz aplikacije ili
+  // ručnim evidentiranjem (poziv, LinkedIn); ponovni dodir istog kontakta se
+  // ne broji dvaput
   contacted: number;
-  interactions: number;
+  followUpsSent: number;
   lastActivity: string | null;
 };
 
 export async function getUsersSummary(): Promise<UserSummaryRow[]> {
   const supabase = createClient();
 
-  const [usersRes, assignmentsRes, interactionsRes] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, full_name, email")
-      .eq("role", "user")
-      .order("full_name", { ascending: true }),
-    supabase.from("assignments").select("user_id").limit(ROW_LIMIT),
-    supabase
-      .from("interactions")
-      .select("user_id, contact_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(ROW_LIMIT),
-  ]);
+  const [usersRes, assignmentsRes, interactionsRes, emailsRes] =
+    await Promise.all([
+      supabase
+        .from("users")
+        .select("id, full_name, email")
+        .eq("role", "user")
+        .order("full_name", { ascending: true }),
+      supabase.from("assignments").select("user_id").limit(ROW_LIMIT),
+      supabase
+        .from("interactions")
+        .select("user_id, contact_id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(ROW_LIMIT),
+      supabase
+        .from("emails")
+        .select("user_id, contact_id")
+        .eq("status", "sent")
+        .not("contact_id", "is", null)
+        .limit(ROW_LIMIT),
+    ]);
 
   const assignedByUser = new Map<number, number>();
   for (const row of assignmentsRes.data ?? []) {
@@ -254,16 +287,10 @@ export async function getUsersSummary(): Promise<UserSummaryRow[]> {
     assignedByUser.set(row.user_id, (assignedByUser.get(row.user_id) ?? 0) + 1);
   }
 
-  const interactionsByUser = new Map<number, number>();
   const contactedByUser = new Map<number, Set<number>>();
   const lastActivityByUser = new Map<number, string>();
   for (const row of interactionsRes.data ?? []) {
     if (row.user_id === null) continue;
-
-    interactionsByUser.set(
-      row.user_id,
-      (interactionsByUser.get(row.user_id) ?? 0) + 1,
-    );
 
     if (row.contact_id !== null) {
       const set = contactedByUser.get(row.user_id) ?? new Set<number>();
@@ -277,12 +304,30 @@ export async function getUsersSummary(): Promise<UserSummaryRow[]> {
     }
   }
 
+  // Baza nema oznaku da je mejl follow up, pa se izvodi po istom pravilu po
+  // kom se pomera i status (lib/email/send.ts): drugi mejl istom kontaktu
+  // jeste follow up. Otud: poslati mejlovi − različiti kontakti kojima je slato.
+  const sentByUser = new Map<number, number>();
+  const emailedByUser = new Map<number, Set<number>>();
+  for (const row of emailsRes.data ?? []) {
+    if (row.contact_id === null) continue;
+
+    sentByUser.set(row.user_id, (sentByUser.get(row.user_id) ?? 0) + 1);
+
+    const set = emailedByUser.get(row.user_id) ?? new Set<number>();
+    set.add(row.contact_id);
+    emailedByUser.set(row.user_id, set);
+  }
+
   return (usersRes.data ?? []).map((user) => ({
     userId: user.id,
     name: user.full_name || user.email || `Korisnik #${user.id}`,
     assigned: assignedByUser.get(user.id) ?? 0,
     contacted: contactedByUser.get(user.id)?.size ?? 0,
-    interactions: interactionsByUser.get(user.id) ?? 0,
+    followUpsSent: Math.max(
+      0,
+      (sentByUser.get(user.id) ?? 0) - (emailedByUser.get(user.id)?.size ?? 0),
+    ),
     lastActivity: lastActivityByUser.get(user.id) ?? null,
   }));
 }
