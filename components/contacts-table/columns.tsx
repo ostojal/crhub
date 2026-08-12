@@ -44,6 +44,9 @@ export type ContactRow = {
     interest_tag: string | null;
     updated_at: string;
   }[];
+  // Kontakt ima mejl koji čeka slanje — status se prikazuje kao "Zakazano".
+  // Ne dolazi iz tabele contacts, dopisuje ga stranica (app/contacts/page.tsx).
+  email_pending?: boolean;
 };
 
 export function getAssigneeName(row: ContactRow): string | null {
@@ -232,6 +235,7 @@ export function buildContactColumns({
       cell: ({ row }) => (
         <StatusBadge
           status={row.original.contact_status?.[0]?.communication_status}
+          pending={row.original.email_pending}
         />
       ),
     },

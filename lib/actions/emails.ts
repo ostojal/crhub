@@ -12,6 +12,10 @@ import { decryptSecret } from "@/lib/email/crypto";
 import { revokeRefreshToken } from "@/lib/email/google";
 import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
 import { claimEmail, sendClaimedEmail } from "@/lib/email/send";
+import {
+  advanceStatusForEmail,
+  revertStatusAfterCancel,
+} from "@/lib/email/status";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { cleanText, isId, normalizeEmail } from "@/lib/validate";
@@ -313,6 +317,10 @@ export async function composeEmail(
     return { ok: false, error: "Greška pri pripremi mejla." };
   }
 
+  // Kontakt dobija status čim je mejl zakazan — ne mora da se upisuje ručno.
+  // Dok mejl ne ode, liste ga prikazuju kao "Zakazano" (StatusBadge).
+  await advanceStatusForEmail(supabase, input.contactId, created.id, me.email);
+
   if (scheduledAt) {
     revalidateEmailPaths(input.contactId);
     return {
@@ -508,8 +516,17 @@ export async function cancelScheduledEmail(
     return { ok: false, error: "Mejl je u međuvremenu poslat ili otkazan." };
   }
 
-  revalidatePath("/mejlovi");
-  if (data[0].contact_id) revalidatePath(`/contacts/${data[0].contact_id}`);
+  // Status upisan pri zakazivanju otpada zajedno sa mejlom, osim ako je
+  // kontakt u međuvremenu zaista kontaktiran
+  if (data[0].contact_id) {
+    await revertStatusAfterCancel(supabase, data[0].contact_id, me.email);
+  }
+
+  if (data[0].contact_id) {
+    revalidateEmailPaths(data[0].contact_id);
+  } else {
+    revalidatePath("/mejlovi");
+  }
 
   return { ok: true, message: "Zakazani mejl je otkazan." };
 }

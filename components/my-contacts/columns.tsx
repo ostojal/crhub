@@ -27,6 +27,9 @@ export type MyContact = {
     interest_tag: string | null;
     updated_at: string;
   }[];
+  // Kontakt ima mejl koji čeka slanje — status se prikazuje kao "Zakazano".
+  // Dopisuje ga stranica (app/moji-kontakti/page.tsx), nije kolona u bazi.
+  email_pending?: boolean;
 };
 
 export function contactDisplayName(contact: {
@@ -127,6 +130,7 @@ export function buildMyContactColumns({
       cell: ({ row }) => (
         <StatusBadge
           status={row.original.contact_status?.[0]?.communication_status}
+          pending={row.original.email_pending}
         />
       ),
     },

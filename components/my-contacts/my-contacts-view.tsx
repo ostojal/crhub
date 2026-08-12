@@ -118,7 +118,7 @@ export function MyContactsView({ contacts }: { contacts: MyContact[] }) {
             </MobileField>
           )}
           <MobileField label="Status">
-            <StatusBadge status={status} />
+            <StatusBadge status={status} pending={contact.email_pending} />
           </MobileField>
           <MobileField label="Dodeljeno">
             {format(contact.assigned_at, "dd.MM.yyyy.")}

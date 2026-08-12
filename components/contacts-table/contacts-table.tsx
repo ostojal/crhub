@@ -201,7 +201,7 @@ function ContactMobileCard({
         )}
         {isAdmin && (
           <MobileField label="Status">
-            <StatusBadge status={status} />
+            <StatusBadge status={status} pending={contact.email_pending} />
           </MobileField>
         )}
         {isAdmin && contact.created_at && (

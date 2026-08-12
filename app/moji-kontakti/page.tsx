@@ -1,6 +1,7 @@
 import type { MyContact } from "@/components/my-contacts/columns";
 import { MyContactsView } from "@/components/my-contacts/my-contacts-view";
 import { requireRole } from "@/lib/dal";
+import { getPendingEmailContactIds } from "@/lib/email/status";
 import { createClient } from "@/lib/supabase/server";
 
 // Korisnik ima desetine, ne hiljade dodeljenih kontakata, pa se učitavaju svi
@@ -37,6 +38,16 @@ export default async function MyContactsPage() {
     if (!assignment.contacts) return [];
     return [{ ...assignment.contacts, assigned_at: assignment.assigned_at }];
   }) as unknown as MyContact[];
+
+  // Kontakti sa mejlom koji čeka slanje — status im piše "Zakazano"
+  const pending = await getPendingEmailContactIds(
+    supabase,
+    contacts.map((contact) => contact.id),
+  );
+
+  for (const contact of contacts) {
+    contact.email_pending = pending.has(contact.id);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">

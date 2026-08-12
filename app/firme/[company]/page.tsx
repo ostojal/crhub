@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { NOT_NOTE_FILTER } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
+import { getPendingEmailContactIds } from "@/lib/email/status";
 import { formatPhoneNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
@@ -78,6 +79,12 @@ export default async function CompanyPage({
 
   const contacts = (data ?? []) as unknown as CompanyContact[];
   if (contacts.length === 0) notFound();
+
+  // Kontakti sa mejlom koji čeka slanje — status im piše "Zakazano"
+  const pendingEmail = await getPendingEmailContactIds(
+    supabase,
+    contacts.map((contact) => contact.id),
+  );
 
   const contactedCount = contacts.filter(
     (contact) => (contact.interactions[0]?.count ?? 0) > 0,
@@ -161,7 +168,10 @@ export default async function CompanyPage({
                 )}
                 <MobileField label="Status">
                   <span className="inline-flex flex-wrap justify-end gap-1">
-                    <StatusBadge status={status?.communication_status} />
+                    <StatusBadge
+                      status={status?.communication_status}
+                      pending={pendingEmail.has(contact.id)}
+                    />
                     {status?.interest_tag && (
                       <Badge variant="outline">{status.interest_tag}</Badge>
                     )}
@@ -254,7 +264,10 @@ export default async function CompanyPage({
                   </TableCell>
                   <TableCell className="px-4">
                     <div className="flex flex-wrap gap-1">
-                      <StatusBadge status={status?.communication_status} />
+                      <StatusBadge
+                        status={status?.communication_status}
+                        pending={pendingEmail.has(contact.id)}
+                      />
                       {status?.interest_tag && (
                         <Badge variant="outline">{status.interest_tag}</Badge>
                       )}

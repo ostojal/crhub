@@ -1,7 +1,6 @@
 import "server-only";
 
 import { ATTACHMENTS_BUCKET } from "@/lib/constants";
-import { setContactStatus } from "@/lib/contact-status";
 import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +15,7 @@ import {
 } from "./html";
 import { buildMimeMessage, type MimeAttachment } from "./mime";
 import { applyPlaceholders } from "./placeholders";
+import { advanceStatusForEmail } from "./status";
 
 type Client = SupabaseClient<Database>;
 
@@ -30,6 +30,9 @@ const STUCK_MINUTES = 10;
 const BATCH_SIZE = 10;
 
 const MAX_ERROR_LENGTH = 500;
+
+// Po ovome se kontaktiranje koje je upisala aplikacija razlikuje od ručnog
+const SENT_NOTE_PREFIX = "Poslat mejl:";
 
 // Atomsko preuzimanje: uslovni UPDATE nad jednim redom. Ko prvi stigne dobija
 // red, ostali (drugi cron poziv ili otkazivanje) dobijaju 0 redova. Time se
@@ -113,43 +116,38 @@ async function logSentEmail(
 ): Promise<void> {
   if (!email.contact_id) return;
 
-  await supabase.from("interactions").insert({
-    contact_id: email.contact_id,
-    user_id: email.user_id,
-    type: "email",
-    notes: `Poslat mejl: „${subject}”`,
-  });
-
-  const { data: current } = await supabase
-    .from("contact_status")
-    .select("communication_status")
+  // Ako je pošiljalac isto kontaktiranje već upisao ručno dok je mejl čekao
+  // slanje, drugi red bi ga duplirao — i u istoriji kontakta i u analitici.
+  // Gleda se prozor od pripreme mejla do sada, i to samo ručni unosi: redovi
+  // koje je upisala aplikacija (drugi mejl istom kontaktu) nisu duplikat.
+  const { data: since } = await supabase
+    .from("interactions")
+    .select("notes")
     .eq("contact_id", email.contact_id)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq("user_id", email.user_id)
+    .eq("type", "email")
+    .gte("created_at", email.created_at)
+    .limit(20);
 
-  // Lestvica ide samo naviše — bolji ishodi ("Dobijen odgovor", "Prihvaćeno"…)
-  // se ne vraćaju unazad:
-  //   prazno / "Nije kontaktiran" → "Poslato"
-  //   "Poslato" / "Poslati follow up" → "Poslat follow up"
-  // Drugi mejl istom kontaktu jeste follow up, pa se evidentira sam od sebe.
-  const status = current?.communication_status;
+  const loggedByHand = (since ?? []).some(
+    (row) => !(row.notes ?? "").startsWith(SENT_NOTE_PREFIX),
+  );
 
-  const next =
-    !status || status === "Nije kontaktiran"
-      ? "Poslato"
-      : status === "Poslato" || status === "Poslati follow up"
-        ? "Poslat follow up"
-        : null;
-
-  if (next) {
-    await setContactStatus(
-      supabase,
-      email.contact_id,
-      { communication_status: next },
-      senderEmail,
-    );
+  if (!loggedByHand) {
+    await supabase.from("interactions").insert({
+      contact_id: email.contact_id,
+      user_id: email.user_id,
+      type: "email",
+      notes: `${SENT_NOTE_PREFIX} „${subject}”`,
+    });
   }
+
+  await advanceStatusForEmail(
+    supabase,
+    email.contact_id,
+    email.id,
+    senderEmail,
+  );
 }
 
 // Šalje red koji je već preuzet (status='sending'). Isti put koriste i

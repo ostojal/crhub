@@ -6,6 +6,7 @@ import { ContactsTable } from "@/components/contacts-table/contacts-table";
 import { CONTACT_CATEGORIES } from "@/lib/constants";
 import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { requireRole } from "@/lib/dal";
+import { getPendingEmailContactIds } from "@/lib/email/status";
 import { createClient } from "@/lib/supabase/server";
 import { escapeLike, isOneOf } from "@/lib/validate";
 
@@ -124,12 +125,26 @@ export default async function ContactsPage({
     );
   }
 
+  const rows = (contacts ?? []) as unknown as ContactRow[];
+
+  // Kontakti sa mejlom koji čeka slanje — status im se prikazuje kao
+  // "Zakazano". Editor status ni ne vidi, pa se za njega upit preskače.
+  const pending = isAdmin
+    ? await getPendingEmailContactIds(
+        supabase,
+        rows.map((row) => row.id),
+      )
+    : new Set<number>();
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
 
       <ContactsTable
-        contacts={(contacts ?? []) as unknown as ContactRow[]}
+        contacts={rows.map((row) => ({
+          ...row,
+          email_pending: pending.has(row.id),
+        }))}
         contactsCount={count ?? 0}
         viewer={me.role as "admin" | "editor"}
         assignees={(assignees ?? []) as AssigneeOption[]}

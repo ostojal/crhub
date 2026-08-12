@@ -21,18 +21,33 @@ const STATUS_STYLES: Record<string, string> = {
   Prihvaćeno:
     "border-emerald-600/35 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   Odbijeno: "border-red-600/30 bg-red-500/10 text-red-700 dark:text-red-400",
+  // Nije vrednost iz baze — vidi `pending` ispod
+  Zakazano:
+    "border-indigo-600/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
 };
 
 const FALLBACK_LABEL = "Nije kontaktiran";
 
+// Zakazan mejl već pomera status na "Poslato" (lib/email/status.ts), da bi
+// kontakt odmah izašao iz "nije kontaktiran" i bez ručnog upisa. Dok mejl
+// stvarno ne ode, prikazuje se kao "Zakazano" — čim ode, piše "Poslato".
+const PENDING_LABEL = "Zakazano";
+const PENDING_OVER = new Set(["Poslato", "Poslat follow up"]);
+
 export function StatusBadge({
   status,
+  pending,
   className,
 }: {
   status: string | null | undefined;
+  // Kontakt ima mejl koji čeka slanje
+  pending?: boolean;
   className?: string;
 }) {
-  const label = status || FALLBACK_LABEL;
+  const label =
+    pending && status && PENDING_OVER.has(status)
+      ? PENDING_LABEL
+      : status || FALLBACK_LABEL;
   const style = STATUS_STYLES[label] ?? STATUS_STYLES[FALLBACK_LABEL];
 
   return (

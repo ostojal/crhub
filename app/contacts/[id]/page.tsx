@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { EmailStatus } from "@/lib/constants";
 import { requireContactAccess } from "@/lib/dal";
+import { PENDING_EMAIL_STATUSES } from "@/lib/email/status";
 import { formatPhoneNumber } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
@@ -68,6 +69,12 @@ export default async function ContactDetailPage({
   const name =
     [contact.first_name, contact.last_name].filter(Boolean).join(" ") || "—";
   const status = contact.contact_status[0] ?? null;
+
+  // Zakazan mejl je već pomerio status na "Poslato"; dok ne ode, piše
+  // "Zakazano"
+  const hasPendingEmail = (emails ?? []).some((email) =>
+    (PENDING_EMAIL_STATUSES as readonly string[]).includes(email.status),
+  );
   const assignment = contact.assignments[0] ?? null;
   const assigneeName =
     assignment?.users?.full_name || assignment?.users?.email || null;
@@ -139,7 +146,10 @@ export default async function ContactDetailPage({
             {[contact.job_title, contact.company].filter(Boolean).join(" · ")}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <StatusBadge status={status?.communication_status} />
+            <StatusBadge
+              status={status?.communication_status}
+              pending={hasPendingEmail}
+            />
             {status?.interest_tag && (
               <Badge variant="outline">{status.interest_tag}</Badge>
             )}
