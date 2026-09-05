@@ -67,6 +67,8 @@ U SQL editoru pokreni redom:
    dva odeljka koja se pokreću **odvojeno**: prvo dva `alter type`, pa tek onda
    ostatak. Postgres ne dozvoljava da se nova vrednost enuma upotrebi u istoj
    transakciji u kojoj je dodata.
+5. `db/projects.sql` — deli podatke po projektima (šabloni, prilozi, mejlovi i
+   istorija dobijaju `project_id`). Vidi `docs/projekti.md`.
 
 Sve skripte su idempotentne.
 

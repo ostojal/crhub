@@ -7,7 +7,7 @@ import {
   MAX_FOLLOW_UP_DAYS,
   MIN_FOLLOW_UP_DAYS,
 } from "@/lib/constants";
-import { checkRole } from "@/lib/dal";
+import { checkProjectRole, checkRole } from "@/lib/dal";
 import { isEmptyHtml, sanitizeEmailHtml } from "@/lib/email/html";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
@@ -85,8 +85,9 @@ export type EmailTemplateInput = {
 export async function saveEmailTemplate(
   input: EmailTemplateInput,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
 
   const name = cleanText(input.name, 100);
   const subject = cleanText(input.subject, 300);
@@ -110,7 +111,8 @@ export async function saveEmailTemplate(
     const { error } = await supabase
       .from("email_templates")
       .update({ name, subject, body, updated_at: new Date().toISOString() })
-      .eq("id", input.id);
+      .eq("id", input.id)
+      .eq("project_id", project.id);
 
     if (error) return { ok: false, error: "Greška pri izmeni šablona." };
 
@@ -120,7 +122,7 @@ export async function saveEmailTemplate(
 
   const { error } = await supabase
     .from("email_templates")
-    .insert({ name, subject, body });
+    .insert({ project_id: project.id, name, subject, body });
 
   if (error) return { ok: false, error: "Greška pri dodavanju šablona." };
 
@@ -129,15 +131,18 @@ export async function saveEmailTemplate(
 }
 
 export async function deleteEmailTemplate(id: number): Promise<ActionResult> {
-  const me = await checkRole("admin");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
+
   if (!isId(id)) return { ok: false, error: "Nepoznat šablon." };
 
   const supabase = createClient();
   const { error } = await supabase
     .from("email_templates")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("project_id", project.id);
 
   if (error) return { ok: false, error: "Greška pri brisanju šablona." };
 
@@ -206,8 +211,9 @@ export async function saveAttachmentTemplate(input: {
   storagePath: string;
   mimeType: string;
 }): Promise<ActionResult> {
-  const me = await checkRole("admin");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
 
   const name = cleanText(input.name, 150);
   if (!name) return { ok: false, error: "Naziv priloga je obavezan." };
@@ -234,6 +240,7 @@ export async function saveAttachmentTemplate(input: {
   }
 
   const { error } = await supabase.from("attachment_templates").insert({
+    project_id: project.id,
     name,
     storage_path: storagePath,
     mime_type:
@@ -256,8 +263,10 @@ export async function saveAttachmentTemplate(input: {
 export async function deleteAttachmentTemplate(
   id: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
+
   if (!isId(id)) return { ok: false, error: "Nepoznat prilog." };
 
   const supabase = createClient();
@@ -266,6 +275,7 @@ export async function deleteAttachmentTemplate(
   const { count } = await supabase
     .from("emails")
     .select("id", { count: "exact", head: true })
+    .eq("project_id", project.id)
     .eq("status", "scheduled")
     .contains("attachment_ids", [id]);
 
@@ -280,6 +290,7 @@ export async function deleteAttachmentTemplate(
     .from("attachment_templates")
     .select("storage_path")
     .eq("id", id)
+    .eq("project_id", project.id)
     .maybeSingle();
 
   if (!attachment) return { ok: false, error: "Prilog ne postoji." };
@@ -287,7 +298,8 @@ export async function deleteAttachmentTemplate(
   const { error } = await supabase
     .from("attachment_templates")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("project_id", project.id);
 
   if (error) return { ok: false, error: "Greška pri brisanju priloga." };
 

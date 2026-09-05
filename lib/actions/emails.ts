@@ -6,7 +6,7 @@ import {
   MAX_SIGNATURE_CHARS,
   MAX_TOTAL_ATTACHMENT_BYTES,
 } from "@/lib/constants";
-import { checkRole, hasContactAccess } from "@/lib/dal";
+import { checkProjectRole, checkRole, hasContactAccess } from "@/lib/dal";
 import type { Database } from "@/lib/database.types";
 import { decryptSecret } from "@/lib/email/crypto";
 import { revokeRefreshToken } from "@/lib/email/google";
@@ -67,12 +67,14 @@ export type ComposeContext =
 export async function getComposeContext(
   contactId: number,
 ): Promise<ComposeContext> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
+
   if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
   const supabase = createClient();
-  if (!(await hasContactAccess(me, contactId))) {
+  if (!(await hasContactAccess(me, contactId, project.id))) {
     return { ok: false, error: NO_PERMISSION };
   }
 
@@ -93,9 +95,12 @@ export async function getComposeContext(
         .select("email_signature")
         .eq("id", me.id)
         .maybeSingle(),
+      // Šabloni i prilozi pripadaju projektu — tekst i materijali za
+      // DigiHack se ne nude dok se radi na GreenTour-u
       supabase
         .from("email_templates")
         .select("id, name, subject, body")
+        .eq("project_id", project.id)
         .order("name", { ascending: true }),
       supabase
         .from("cc_bcc_options")
@@ -104,6 +109,7 @@ export async function getComposeContext(
       supabase
         .from("attachment_templates")
         .select("id, name, size_bytes")
+        .eq("project_id", project.id)
         .order("name", { ascending: true }),
     ]);
 
@@ -178,6 +184,7 @@ type ParsedEmail =
 // Zajedničke provere sadržaja za slanje i za izmenu zakazanog mejla
 async function parseEmailContent(
   supabase: Client,
+  projectId: number,
   input: Omit<ComposeEmailInput, "contactId">,
 ): Promise<ParsedEmail> {
   if (
@@ -241,9 +248,11 @@ async function parseEmailContent(
   }
 
   if (input.attachmentIds.length > 0) {
+    // Prilog sa drugog projekta se ne može zakačiti
     const { data: attachments } = await supabase
       .from("attachment_templates")
       .select("id, size_bytes")
+      .eq("project_id", projectId)
       .in("id", input.attachmentIds);
 
     if (
@@ -268,17 +277,18 @@ async function parseEmailContent(
 export async function composeEmail(
   input: ComposeEmailInput,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (!isId(input.contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
   const supabase = createClient();
-  if (!(await hasContactAccess(me, input.contactId))) {
+  if (!(await hasContactAccess(me, input.contactId, project.id))) {
     return { ok: false, error: NO_PERMISSION };
   }
 
-  const parsed = await parseEmailContent(supabase, input);
+  const parsed = await parseEmailContent(supabase, project.id, input);
   if (!parsed.ok) return parsed;
 
   const { subject, body, cc, bcc, scheduledAt } = parsed;
@@ -299,6 +309,7 @@ export async function composeEmail(
   const { data: created, error } = await supabase
     .from("emails")
     .insert({
+      project_id: project.id,
       contact_id: input.contactId,
       user_id: me.id,
       to_email: toEmail,
@@ -319,7 +330,13 @@ export async function composeEmail(
 
   // Kontakt dobija status čim je mejl zakazan — ne mora da se upisuje ručno.
   // Dok mejl ne ode, liste ga prikazuju kao "Zakazano" (StatusBadge).
-  await advanceStatusForEmail(supabase, input.contactId, created.id, me.email);
+  await advanceStatusForEmail(
+    supabase,
+    project.id,
+    input.contactId,
+    created.id,
+    me.email,
+  );
 
   if (scheduledAt) {
     revalidateEmailPaths(input.contactId);
@@ -374,8 +391,10 @@ export type EmailDetails =
 
 // Pun sadržaj jednog mejla — za pregled poslatog i za izmenu zakazanog
 export async function getEmailDetails(emailId: number): Promise<EmailDetails> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
+
   if (!isId(emailId)) return { ok: false, error: "Nepoznat mejl." };
 
   const supabase = createClient();
@@ -386,6 +405,7 @@ export async function getEmailDetails(emailId: number): Promise<EmailDetails> {
       "id, user_id, contact_id, to_email, cc, bcc, subject, body, status, scheduled_at, sent_at, error, attachment_ids, contacts(first_name, last_name)",
     )
     .eq("id", emailId)
+    .eq("project_id", project.id)
     .maybeSingle();
 
   if (!email) return { ok: false, error: "Mejl ne postoji." };
@@ -442,8 +462,10 @@ export async function updateScheduledEmail(
   emailId: number,
   input: Omit<ComposeEmailInput, "contactId">,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
+
   if (!isId(emailId)) return { ok: false, error: "Nepoznat mejl." };
 
   const supabase = createClient();
@@ -452,6 +474,7 @@ export async function updateScheduledEmail(
     .from("emails")
     .select("id, user_id, contact_id, status")
     .eq("id", emailId)
+    .eq("project_id", project.id)
     .maybeSingle();
 
   if (!existing) return { ok: false, error: "Mejl ne postoji." };
@@ -465,7 +488,7 @@ export async function updateScheduledEmail(
     };
   }
 
-  const parsed = await parseEmailContent(supabase, input);
+  const parsed = await parseEmailContent(supabase, project.id, input);
   if (!parsed.ok) return parsed;
 
   const { error } = await supabase
@@ -493,8 +516,10 @@ export async function updateScheduledEmail(
 export async function cancelScheduledEmail(
   emailId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
+
   if (!isId(emailId)) return { ok: false, error: "Nepoznat mejl." };
 
   const supabase = createClient();
@@ -504,6 +529,7 @@ export async function cancelScheduledEmail(
     .from("emails")
     .update({ status: "cancelled" })
     .eq("id", emailId)
+    .eq("project_id", project.id)
     .eq("status", "scheduled");
 
   if (me.role !== "admin") {
@@ -519,7 +545,12 @@ export async function cancelScheduledEmail(
   // Status upisan pri zakazivanju otpada zajedno sa mejlom, osim ako je
   // kontakt u međuvremenu zaista kontaktiran
   if (data[0].contact_id) {
-    await revertStatusAfterCancel(supabase, data[0].contact_id, me.email);
+    await revertStatusAfterCancel(
+      supabase,
+      project.id,
+      data[0].contact_id,
+      me.email,
+    );
   }
 
   if (data[0].contact_id) {

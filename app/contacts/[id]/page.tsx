@@ -13,6 +13,7 @@ import type { EmailStatus } from "@/lib/constants";
 import { requireContactAccess } from "@/lib/dal";
 import { PENDING_EMAIL_STATUSES } from "@/lib/email/status";
 import { formatPhoneNumber } from "@/lib/format";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { format } from "date-fns";
 import { ArrowLeftIcon } from "lucide-react";
@@ -30,18 +31,24 @@ export default async function ContactDetailPage({
 
   const supabase = createClient();
 
+  // Kontakt je zajednički za sve projekte, ali dodela, status, istorija i
+  // mejlovi se prikazuju samo za aktivan projekat
+  const project = await requireActiveProject();
+
   // Provera pristupa i podaci idu istim kruženjem do baze — svi znaju
   // contactId. Kad pristupa nema, requireContactAccess preusmerava i render
   // nikad ne stigne do dohvaćenih redova.
   const [me, { data: contact }, { data: interactions }, { data: emails }] =
     await Promise.all([
-      requireContactAccess(contactId),
+      requireContactAccess(contactId, project.id),
       supabase
         .from("contacts")
         .select(
           "*, contact_status(communication_status, interest_tag, updated_at), assignments(assigned_at, users(id, full_name, email))",
         )
         .eq("id", contactId)
+        .eq("contact_status.project_id", project.id)
+        .eq("assignments.project_id", project.id)
         .order("updated_at", {
           referencedTable: "contact_status",
           ascending: false,
@@ -50,6 +57,7 @@ export default async function ContactDetailPage({
       supabase
         .from("interactions")
         .select("id, user_id, type, notes, created_at, users(full_name, email)")
+        .eq("project_id", project.id)
         .eq("contact_id", contactId)
         .order("created_at", { ascending: false })
         .limit(100),
@@ -59,6 +67,7 @@ export default async function ContactDetailPage({
         .select(
           "id, user_id, subject, status, scheduled_at, sent_at, users(full_name, email)",
         )
+        .eq("project_id", project.id)
         .eq("contact_id", contactId)
         .order("created_at", { ascending: false })
         .limit(50),
@@ -146,6 +155,7 @@ export default async function ContactDetailPage({
             {[contact.job_title, contact.company].filter(Boolean).join(" · ")}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
+            <Badge variant="outline">{project.name}</Badge>
             <StatusBadge
               status={status?.communication_status}
               pending={hasPendingEmail}

@@ -29,6 +29,11 @@ export const NAV_LINKS: Record<Role, NavLink[]> = {
       description: "Šabloni, prilozi i CC/BCC adrese",
     },
     {
+      href: "/admin/projekti",
+      label: "Projekti",
+      description: "Odvojeni projekti i njihova istorija",
+    },
+    {
       href: "/analitika",
       label: "Analitika",
       description: "Kontaktiranja po korisnicima",

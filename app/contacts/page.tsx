@@ -7,6 +7,7 @@ import { CONTACT_CATEGORIES } from "@/lib/constants";
 import { applyFilter, createSearchFilter } from "@/lib/create-search-filter";
 import { requireRole } from "@/lib/dal";
 import { getPendingEmailContactIds } from "@/lib/email/status";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { escapeLike, isOneOf } from "@/lib/validate";
 
@@ -39,6 +40,7 @@ export default async function ContactsPage({
 }) {
   const me = await requireRole("admin", "editor");
   const isAdmin = me.role === "admin";
+  const project = await requireActiveProject();
 
   const { page, sort, q, category } = await searchParams;
 
@@ -47,6 +49,11 @@ export default async function ContactsPage({
   const query = supabase
     .from("contacts")
     .select(isAdmin ? ADMIN_SELECT : EDITOR_SELECT);
+
+  // Kontakti su zajednički, ali dodela i status pripadaju projektu — bez
+  // ovih filtera bi se u GreenTour-u video rad na DigiHack-u
+  query.eq("assignments.project_id", project.id);
+  if (isAdmin) query.eq("contact_status.project_id", project.id);
 
   const countQuery = supabase.from("contacts").select("id", {
     count: "exact",
@@ -132,13 +139,17 @@ export default async function ContactsPage({
   const pending = isAdmin
     ? await getPendingEmailContactIds(
         supabase,
+        project.id,
         rows.map((row) => row.id),
       )
     : new Set<number>();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-foreground">Kontakti</h1>
+      <h1 className="text-xl font-semibold text-foreground">Kontakti</h1>
+      <p className="mb-6 text-sm text-foreground/60">
+        Dodele i statusi važe za projekat {project.name}.
+      </p>
 
       <ContactsTable
         contacts={rows.map((row) => ({

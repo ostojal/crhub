@@ -4,22 +4,28 @@ import { EmailTemplatesSection } from "@/components/admin/email-templates-sectio
 import { FollowUpSettingsSection } from "@/components/admin/follow-up-settings-section";
 import { requireRole } from "@/lib/dal";
 import { getFollowUpSettings } from "@/lib/follow-up";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminEmailsPage() {
   await requireRole("admin");
+  const project = await requireActiveProject();
 
   const supabase = createClient();
 
   const [templatesRes, attachmentsRes, ccRes, followUpSettings] =
     await Promise.all([
+      // Šabloni i prilozi pripadaju projektu; CC/BCC adrese i rokovi za
+      // follow up su zajednički
       supabase
         .from("email_templates")
         .select("id, name, subject, body")
+        .eq("project_id", project.id)
         .order("name", { ascending: true }),
       supabase
         .from("attachment_templates")
         .select("id, name, size_bytes, mime_type")
+        .eq("project_id", project.id)
         .order("name", { ascending: true }),
       supabase
         .from("cc_bcc_options")
@@ -48,7 +54,9 @@ export default async function AdminEmailsPage() {
       </h1>
       <p className="mb-6 text-sm text-foreground/60">
         Šabloni, prilozi, CC/BCC adrese i podsetnici za follow up koje tim
-        koristi pri slanju mejlova.
+        koristi pri slanju mejlova. Šabloni i prilozi važe za projekat{" "}
+        {project.name}; CC/BCC adrese i podsetnici su zajednički za sve
+        projekte.
       </p>
 
       <div className="space-y-6">

@@ -2,6 +2,11 @@ import "server-only";
 
 import { auth } from "@/auth";
 import { ROLES, type Role } from "@/lib/constants";
+import {
+  getActiveProject,
+  NO_PROJECT_ERROR,
+  type Project,
+} from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { escapeLike, isOneOf } from "@/lib/validate";
 import { redirect } from "next/navigation";
@@ -70,12 +75,34 @@ export async function checkRole(...roles: Role[]): Promise<CurrentUser | null> {
   return user;
 }
 
+export type ProjectAccess =
+  | { ok: true; user: CurrentUser; project: Project }
+  | { ok: false; error: string };
+
+// Za server akcije: uloga i projekat na kom se radi, u jednoj proveri.
+// Dodele, kontaktiranja, statusi i mejlovi pripadaju projektu, pa svaka
+// akcija koja ih dira mora da zna koji je aktivan.
+export async function checkProjectRole(
+  ...roles: Role[]
+): Promise<ProjectAccess> {
+  const user = await checkRole(...roles);
+  if (!user) return { ok: false, error: "Nemaš dozvolu za ovu akciju." };
+
+  const project = await getActiveProject();
+  if (!project) return { ok: false, error: NO_PROJECT_ERROR };
+
+  return { ok: true, user, project };
+}
+
 // Isto pravilo kao requireContactAccess, ali bez redirecta — za server akcije,
 // koje odgovaraju porukom umesto da preusmeravaju. Za više kontakata odjednom
 // vidi grupnu proveru u lib/actions/interactions.ts (jedan upit umesto N).
+// Dodela važi za jedan projekat: kontakt dodeljen na DigiHack-u ne otvara
+// pristup istom kontaktu na GreenTour-u.
 export async function hasContactAccess(
   user: CurrentUser,
   contactId: number,
+  projectId: number,
 ): Promise<boolean> {
   if (user.role === "admin") return true;
 
@@ -83,6 +110,7 @@ export async function hasContactAccess(
   const { data } = await supabase
     .from("assignments")
     .select("id")
+    .eq("project_id", projectId)
     .eq("contact_id", contactId)
     .eq("user_id", user.id)
     .limit(1)
@@ -91,24 +119,17 @@ export async function hasContactAccess(
   return !!data;
 }
 
-// Admin sme svaki kontakt; user samo kontakt koji mu je dodeljen
+// Admin sme svaki kontakt; user samo kontakt koji mu je dodeljen na
+// aktivnom projektu
 export async function requireContactAccess(
   contactId: number,
+  projectId: number,
 ): Promise<CurrentUser> {
   const user = await requireUser();
   if (user.role === "admin") return user;
 
   if (user.role === "user") {
-    const supabase = createClient();
-    const { data: assignment } = await supabase
-      .from("assignments")
-      .select("id")
-      .eq("contact_id", contactId)
-      .eq("user_id", user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (assignment) return user;
+    if (await hasContactAccess(user, contactId, projectId)) return user;
   }
 
   redirect("/");

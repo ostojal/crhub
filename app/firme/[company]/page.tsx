@@ -14,6 +14,7 @@ import { NOT_NOTE_FILTER } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { getPendingEmailContactIds } from "@/lib/email/status";
 import { formatPhoneNumber } from "@/lib/format";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
@@ -46,6 +47,9 @@ export default async function CompanyPage({
 
   const supabase = createClient();
 
+  // Status, dodela i istorija se čitaju samo za aktivan projekat
+  const project = await requireActiveProject();
+
   // Provera uloge i upit idu istim kruženjem do baze; kad uloga ne odgovara,
   // requireRole preusmerava i dohvaćeni redovi se nikad ne prikažu
   const [, { data, error }] = await Promise.all([
@@ -56,6 +60,9 @@ export default async function CompanyPage({
         "id, first_name, last_name, job_title, email, phone, mobile_phone, city, contact_status(communication_status, interest_tag, updated_at), assignments(users(full_name)), interactions(count)",
       )
       .eq("company", company)
+      .eq("contact_status.project_id", project.id)
+      .eq("assignments.project_id", project.id)
+      .eq("interactions.project_id", project.id)
       // Beleške se ne broje u "Kontaktiran" — filter ide nad ugnežđenim
       // redovima, pa i count broji samo stvarna kontaktiranja
       .or(NOT_NOTE_FILTER, { referencedTable: "interactions" })
@@ -83,6 +90,7 @@ export default async function CompanyPage({
   // Kontakti sa mejlom koji čeka slanje — status im piše "Zakazano"
   const pendingEmail = await getPendingEmailContactIds(
     supabase,
+    project.id,
     contacts.map((contact) => contact.id),
   );
 
@@ -119,8 +127,8 @@ export default async function CompanyPage({
       </div>
 
       <p className="mb-6 text-sm text-foreground/60">
-        Kontakata: {contacts.length} · Kontaktirano: {contactedCount} od{" "}
-        {contacts.length}
+        Projekat {project.name} · Kontakata: {contacts.length} · Kontaktirano:{" "}
+        {contactedCount} od {contacts.length}
       </p>
 
       <div className="space-y-3 md:hidden">

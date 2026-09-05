@@ -31,6 +31,30 @@ export type EmailStatus =
 export interface Database {
   public: {
     Tables: {
+      projects: {
+        Row: {
+          id: number;
+          slug: string;
+          name: string;
+          archived: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          slug: string;
+          name: string;
+          archived?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          slug?: string;
+          name?: string;
+          archived?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       users: {
         Row: {
           id: number;
@@ -137,6 +161,7 @@ export interface Database {
       assignments: {
         Row: {
           id: number;
+          project_id: number;
           contact_id: number | null;
           user_id: number | null;
           assigned_at: string;
@@ -144,6 +169,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           contact_id?: number | null;
           user_id?: number | null;
           assigned_at?: string;
@@ -151,12 +177,20 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           contact_id?: number | null;
           user_id?: number | null;
           assigned_at?: string;
           assigned_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "assignments_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "assignments_contact_id_fkey";
             columns: ["contact_id"];
@@ -176,6 +210,7 @@ export interface Database {
       interactions: {
         Row: {
           id: number;
+          project_id: number;
           contact_id: number | null;
           user_id: number | null;
           type: string | null;
@@ -184,6 +219,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           contact_id?: number | null;
           user_id?: number | null;
           type?: string | null;
@@ -192,6 +228,7 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           contact_id?: number | null;
           user_id?: number | null;
           type?: string | null;
@@ -199,6 +236,13 @@ export interface Database {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "interactions_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "interactions_contact_id_fkey";
             columns: ["contact_id"];
@@ -218,6 +262,7 @@ export interface Database {
       contact_status: {
         Row: {
           id: number;
+          project_id: number;
           contact_id: number | null;
           communication_status: CommunicationStatus | null;
           interest_tag: InterestTag | null;
@@ -226,6 +271,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           contact_id?: number | null;
           communication_status?: CommunicationStatus | null;
           interest_tag?: InterestTag | null;
@@ -234,6 +280,7 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           contact_id?: number | null;
           communication_status?: CommunicationStatus | null;
           interest_tag?: InterestTag | null;
@@ -241,6 +288,13 @@ export interface Database {
           updated_by?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "contact_status_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "contact_status_contact_id_fkey";
             columns: ["contact_id"];
@@ -291,6 +345,7 @@ export interface Database {
       email_templates: {
         Row: {
           id: number;
+          project_id: number;
           name: string;
           subject: string;
           body: string;
@@ -299,6 +354,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           name: string;
           subject: string;
           body: string;
@@ -307,17 +363,27 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           name?: string;
           subject?: string;
           body?: string;
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       attachment_templates: {
         Row: {
           id: number;
+          project_id: number;
           name: string;
           storage_path: string;
           mime_type: string;
@@ -326,6 +392,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           name: string;
           storage_path: string;
           mime_type: string;
@@ -334,13 +401,22 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           name?: string;
           storage_path?: string;
           mime_type?: string;
           size_bytes?: number;
           created_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "attachment_templates_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       cc_bcc_options: {
         Row: {
@@ -366,6 +442,7 @@ export interface Database {
       emails: {
         Row: {
           id: number;
+          project_id: number;
           contact_id: number | null;
           user_id: number;
           to_email: string;
@@ -384,6 +461,7 @@ export interface Database {
         };
         Insert: {
           id?: number;
+          project_id: number;
           contact_id?: number | null;
           user_id: number;
           to_email: string;
@@ -402,6 +480,7 @@ export interface Database {
         };
         Update: {
           id?: number;
+          project_id?: number;
           contact_id?: number | null;
           user_id?: number;
           to_email?: string;
@@ -419,6 +498,13 @@ export interface Database {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "emails_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "emails_contact_id_fkey";
             columns: ["contact_id"];

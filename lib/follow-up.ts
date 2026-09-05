@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NOT_NOTE_FILTER } from "@/lib/constants";
-import { setContactStatus } from "@/lib/contact-status";
+import { getContactStatuses, setContactStatus } from "@/lib/contact-status";
 import type { CurrentUser } from "@/lib/dal";
 import type { CommunicationStatus, Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -134,10 +134,6 @@ type ContactData = {
   company: string | null;
   email: string | null;
   phone: string | null;
-  contact_status: {
-    communication_status: CommunicationStatus | null;
-    updated_at: string;
-  }[];
 };
 
 type LastContact = {
@@ -148,7 +144,7 @@ type LastContact = {
 };
 
 const CONTACT_SELECT =
-  "contacts(id, first_name, last_name, company, email, phone, contact_status(communication_status, updated_at))";
+  "contacts(id, first_name, last_name, company, email, phone)";
 
 // Ručno evidentirana kontaktiranja ulaze u follow up tek od uvođenja
 // podsetnika. Starija istorija se namerno ne budi — inače bi svima odjednom
@@ -156,25 +152,19 @@ const CONTACT_SELECT =
 // postojao. Mejlovi poslati iz aplikacije nemaju ovo ograničenje.
 const MANUAL_ANCHOR_SINCE = "2026-07-31T00:00:00+02:00";
 
-function newestStatus(contact: ContactData): CommunicationStatus | null {
-  const statuses = contact.contact_status ?? [];
-  const newest = [...statuses].sort((a, b) =>
-    b.updated_at.localeCompare(a.updated_at),
-  )[0];
-
-  return newest?.communication_status ?? null;
-}
-
-// Poslednje kontaktiranje po kontaktu: mejl poslat iz aplikacije ili ručno
-// evidentirano kontaktiranje (od MANUAL_ANCHOR_SINCE naovamo), šta je novije.
+// Poslednje kontaktiranje po kontaktu, unutar jednog projekta: mejl poslat iz
+// aplikacije ili ručno evidentirano kontaktiranje (od MANUAL_ANCHOR_SINCE
+// naovamo), šta je novije.
 // userId izostavljen = svi korisnici (koristi ga cron).
 async function loadLastContacts(
   supabase: Client,
+  projectId: number,
   userId?: number,
 ): Promise<LastContact[]> {
   const emails = supabase
     .from("emails")
     .select(`contact_id, sent_at, ${CONTACT_SELECT}`)
+    .eq("project_id", projectId)
     .eq("status", "sent")
     .not("contact_id", "is", null)
     .not("sent_at", "is", null)
@@ -185,6 +175,7 @@ async function loadLastContacts(
   const interactions = supabase
     .from("interactions")
     .select(`contact_id, created_at, ${CONTACT_SELECT}`)
+    .eq("project_id", projectId)
     .not("contact_id", "is", null)
     .or(NOT_NOTE_FILTER)
     .gte("created_at", MANUAL_ANCHOR_SINCE)
@@ -216,7 +207,8 @@ async function loadLastContacts(
     byContact.set(contactId, {
       contact_id: contactId,
       lastAt: at,
-      status: newestStatus(contact),
+      // Popunjava se ispod, jednim upitom za sve kontakte
+      status: null,
       contact,
     });
   };
@@ -226,6 +218,17 @@ async function loadLastContacts(
   }
   for (const row of interactionsRes.data ?? []) {
     consider(row.contact_id, row.created_at, row.contacts);
+  }
+
+  // Status se dohvata posebno: ugnežđen unutar kontakta koji je i sam
+  // ugnežđen u mejl, tražio bi filter po punoj putanji da ne bi pokupio i
+  // statuse sa drugih projekata
+  const statuses = await getContactStatuses(supabase, projectId, [
+    ...byContact.keys(),
+  ]);
+
+  for (const row of byContact.values()) {
+    row.status = statuses.get(row.contact_id)?.communication_status ?? null;
   }
 
   return [...byContact.values()];
@@ -246,17 +249,19 @@ function toItem(row: LastContact): FollowUpItem {
   };
 }
 
-// Kontakti koje je ovaj korisnik kontaktirao, a koji čekaju sledeći korak.
-// Vlasništvo ide po tome ko je kontaktirao, ne po dodeli — stranica /mejlovi
-// prikazuje rad tog korisnika, pa isto pravilo važi i za admina.
+// Kontakti koje je ovaj korisnik kontaktirao na aktivnom projektu, a koji
+// čekaju sledeći korak. Vlasništvo ide po tome ko je kontaktirao, ne po
+// dodeli — stranica /mejlovi prikazuje rad tog korisnika, pa isto pravilo
+// važi i za admina.
 export async function getFollowUpQueue(
   me: CurrentUser,
+  projectId: number,
 ): Promise<FollowUpQueue> {
   const supabase = createClient();
 
   const [settings, rows] = await Promise.all([
     getFollowUpSettings(supabase),
-    loadLastContacts(supabase, me.id),
+    loadLastContacts(supabase, projectId, me.id),
   ]);
 
   if (!settings.followUpEnabled && !settings.callReminderEnabled) {
@@ -288,7 +293,12 @@ export async function getFollowUpQueue(
   }
 
   // Podsetnik za poziv otpada čim je poziv evidentiran posle follow up-a
-  const called = await findCalledSince(supabase, me.id, callCandidates);
+  const called = await findCalledSince(
+    supabase,
+    projectId,
+    me.id,
+    callCandidates,
+  );
 
   const byOldest = (a: LastContact, b: LastContact) =>
     a.lastAt.localeCompare(b.lastAt);
@@ -304,6 +314,7 @@ export async function getFollowUpQueue(
 
 async function findCalledSince(
   supabase: Client,
+  projectId: number,
   userId: number,
   rows: LastContact[],
 ): Promise<Set<number>> {
@@ -317,6 +328,7 @@ async function findCalledSince(
   const { data } = await supabase
     .from("interactions")
     .select("contact_id, created_at")
+    .eq("project_id", projectId)
     .eq("user_id", userId)
     .eq("type", "poziv")
     .in(
@@ -342,27 +354,36 @@ async function findCalledSince(
 // Cron: kontaktima kojima je istekao rok upisuje "Poslati follow up".
 // Posle upisa uslov (status = "Poslato") više ne važi, pa je operacija
 // idempotentna i ne radi ništa pri sledećem prolazu.
+// Prolazi kroz svaki projekat na kom se radi; arhivirani se preskaču.
 export async function promoteDueFollowUps(): Promise<{ promoted: number }> {
   const supabase = createClient();
 
   const settings = await getFollowUpSettings(supabase);
   if (!settings.followUpEnabled) return { promoted: 0 };
 
-  const rows = await loadLastContacts(supabase);
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("archived", false);
 
   let promoted = 0;
-  for (const row of rows) {
-    if (row.status !== "Poslato") continue;
-    if (!isDue(row.lastAt, settings.followUpDays)) continue;
+  for (const project of projects ?? []) {
+    const rows = await loadLastContacts(supabase, project.id);
 
-    const ok = await setContactStatus(
-      supabase,
-      row.contact_id,
-      { communication_status: "Poslati follow up" },
-      "sistem",
-    );
+    for (const row of rows) {
+      if (row.status !== "Poslato") continue;
+      if (!isDue(row.lastAt, settings.followUpDays)) continue;
 
-    if (ok) promoted += 1;
+      const ok = await setContactStatus(
+        supabase,
+        project.id,
+        row.contact_id,
+        { communication_status: "Poslati follow up" },
+        "sistem",
+      );
+
+      if (ok) promoted += 1;
+    }
   }
 
   return { promoted };

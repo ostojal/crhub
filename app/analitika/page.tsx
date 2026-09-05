@@ -7,6 +7,7 @@ import {
   getUsersSummary,
 } from "@/lib/analytics";
 import { requireRole } from "@/lib/dal";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
@@ -17,15 +18,19 @@ export default async function AnalyticsPage({
   searchParams: Promise<{ user?: string }>;
 }) {
   const me = await requireRole("admin", "user");
+  const project = await requireActiveProject();
 
   if (me.role === "user") {
-    const stats = await getUserStats(me.id);
+    const stats = await getUserStats(project.id, me.id);
 
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-8">
-        <h1 className="mb-6 text-xl font-semibold text-foreground">
+        <h1 className="text-xl font-semibold text-foreground">
           Moja analitika
         </h1>
+        <p className="mb-6 text-sm text-foreground/60">
+          Projekat {project.name}
+        </p>
         <UserStatsView stats={stats} />
       </div>
     );
@@ -44,7 +49,7 @@ export default async function AnalyticsPage({
         .select("id, full_name, email")
         .eq("id", targetId)
         .maybeSingle(),
-      getUserStats(targetId),
+      getUserStats(project.id, targetId),
     ]);
 
     if (target) {
@@ -59,9 +64,12 @@ export default async function AnalyticsPage({
             <ArrowLeftIcon className="size-4" />
             Svi korisnici
           </Link>
-          <h1 className="mb-6 text-xl font-semibold text-foreground">
+          <h1 className="text-xl font-semibold text-foreground">
             Analitika: {name}
           </h1>
+          <p className="mb-6 text-sm text-foreground/60">
+            Projekat {project.name}
+          </p>
           <UserStatsView stats={stats} />
         </div>
       );
@@ -69,8 +77,8 @@ export default async function AnalyticsPage({
   }
 
   const [rows, byCategory] = await Promise.all([
-    getUsersSummary(),
-    getContactedByCategory(),
+    getUsersSummary(project.id),
+    getContactedByCategory(project.id),
   ]);
 
   const contactedTotal = byCategory.reduce((sum, item) => sum + item.count, 0);
@@ -79,8 +87,8 @@ export default async function AnalyticsPage({
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <h1 className="mb-1 text-xl font-semibold text-foreground">Analitika</h1>
       <p className="mb-6 text-sm text-foreground/60">
-        Pregled kontaktiranja po korisnicima. Otvori detalje za pojedinačnu
-        analitiku.
+        Pregled kontaktiranja po korisnicima na projektu {project.name}. Otvori
+        detalje za pojedinačnu analitiku.
       </p>
 
       <Card className="mb-6">

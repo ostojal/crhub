@@ -13,6 +13,7 @@ import { getUserStats, getUsersSummary } from "@/lib/analytics";
 import { NOT_NOTE_FILTER, ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
+import { getActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -45,6 +46,10 @@ export default async function Home() {
   const links = NAV_LINKS[user.role];
   const firstName = user.fullName?.split(" ")[0];
 
+  // Početna namerno ne baca kad projekta nema: to je jedina strana sa koje
+  // administrator može da dođe do /admin/projekti i pokrene db/projects.sql
+  const project = await getActiveProject();
+
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
       <h1 className="text-xl font-semibold text-foreground">
@@ -52,7 +57,21 @@ export default async function Home() {
       </h1>
       <p className="mt-1 text-sm text-foreground/60">
         Uloga: {ROLE_LABELS[user.role]}
+        {project ? ` · Projekat: ${project.name}` : ""}
       </p>
+
+      {!project && (
+        <Card className="mt-6 border-destructive/40">
+          <CardHeader>
+            <CardTitle>Nema aktivnog projekta</CardTitle>
+            <CardDescription>
+              Pokreni <code>db/projects.sql</code> u Supabase SQL editoru, ili
+              vrati neki projekat iz arhive na stranici Projekti. Ostale
+              stranice do tada ne mogu da se prikažu.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {links.length > 0 ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -73,14 +92,24 @@ export default async function Home() {
         </p>
       )}
 
-      {user.role === "user" && <UserDashboard userId={user.id} />}
-      {user.role === "admin" && <AdminDashboard />}
+      {project && user.role === "user" && (
+        <UserDashboard projectId={project.id} userId={user.id} />
+      )}
+      {project && user.role === "admin" && (
+        <AdminDashboard projectId={project.id} />
+      )}
     </div>
   );
 }
 
-async function UserDashboard({ userId }: { userId: number }) {
-  const stats = await getUserStats(userId);
+async function UserDashboard({
+  projectId,
+  userId,
+}: {
+  projectId: number;
+  userId: number;
+}) {
+  const stats = await getUserStats(projectId, userId);
 
   return (
     <section className="mt-10">
@@ -92,19 +121,24 @@ async function UserDashboard({ userId }: { userId: number }) {
   );
 }
 
-async function AdminDashboard() {
+async function AdminDashboard({ projectId }: { projectId: number }) {
   const supabase = createClient();
 
   const [rows, contactsRes, assignedRes, interactionsRes] = await Promise.all([
-    getUsersSummary(),
+    getUsersSummary(projectId),
+    // Kontakti su zajednički za sve projekte; dodele i kontaktiranja nisu
     supabase.from("contacts").select("id", { count: "exact", head: true }),
-    supabase.from("assignments").select("id", { count: "exact", head: true }),
+    supabase
+      .from("assignments")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId),
     // Pravi count nad celom tabelom — tabela ispod prikazuje različite
     // kontakte po korisniku, pa se njihovim sabiranjem ovaj broj ne dobija.
     // Beleške nisu kontaktiranje, pa ispadaju.
     supabase
       .from("interactions")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .or(NOT_NOTE_FILTER),
   ]);
 
