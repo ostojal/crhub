@@ -20,15 +20,39 @@ alter table public.users add constraint users_role_check
   check (role is null or role in ('admin', 'editor', 'user'));
 
 -- 3) Jedan izvršilac po kontaktu (prvo ukloni eventualne duplikate, ostaje
---    najnovija dodela; id je tiebreak za identične timestamp-ove)
-delete from public.assignments a
-  using public.assignments b
-  where a.contact_id = b.contact_id
-    and a.id <> b.id
-    and (a.assigned_at, a.id) < (b.assigned_at, b.id);
+--    najnovija dodela; id je tiebreak za identične timestamp-ove).
+--    Posle db/projects.sql pravilo glasi "jedan izvršilac po kontaktu I
+--    projektu" — isti kontakt sme da ima različite izvršioce na DigiHack-u i
+--    GreenTour-u. Otud provera kolone: skripta ostaje bezbedna za ponovno
+--    pokretanje i pre i posle uvođenja projekata.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'assignments'
+        and column_name = 'project_id'
+  ) then
+    delete from public.assignments a
+      using public.assignments b
+      where a.contact_id = b.contact_id
+        and a.project_id = b.project_id
+        and a.id <> b.id
+        and (a.assigned_at, a.id) < (b.assigned_at, b.id);
 
-create unique index if not exists assignments_contact_id_key
-  on public.assignments (contact_id);
+    create unique index if not exists assignments_contact_project_key
+      on public.assignments (contact_id, project_id);
+  else
+    delete from public.assignments a
+      using public.assignments b
+      where a.contact_id = b.contact_id
+        and a.id <> b.id
+        and (a.assigned_at, a.id) < (b.assigned_at, b.id);
+
+    create unique index if not exists assignments_contact_id_key
+      on public.assignments (contact_id);
+  end if;
+end $$;
 
 -- 4) Indeksi za upite koje aplikacija koristi
 create index if not exists assignments_user_id_idx

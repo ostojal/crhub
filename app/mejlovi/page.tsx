@@ -5,6 +5,7 @@ import { SignatureCard } from "@/components/email/signature-card";
 import type { EmailStatus } from "@/lib/constants";
 import { requireRole } from "@/lib/dal";
 import { getFollowUpQueue } from "@/lib/follow-up";
+import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
 
@@ -12,6 +13,7 @@ const EMAIL_LIMIT = 100;
 
 export default async function EmailsPage() {
   const me = await requireRole("admin", "user");
+  const project = await requireActiveProject();
 
   const supabase = createClient();
 
@@ -36,10 +38,11 @@ export default async function EmailsPage() {
       .select(
         "id, contact_id, to_email, subject, status, scheduled_at, sent_at, error, contacts(first_name, last_name)",
       )
+      .eq("project_id", project.id)
       .eq("user_id", me.id)
       .order("created_at", { ascending: false })
       .limit(EMAIL_LIMIT),
-    getFollowUpQueue(me),
+    getFollowUpQueue(me, project.id),
   ]);
 
   const items: EmailListItem[] = (emails ?? []).map((email) => ({
@@ -69,7 +72,8 @@ export default async function EmailsPage() {
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <h1 className="mb-1 text-xl font-semibold text-foreground">Mejlovi</h1>
       <p className="mb-6 text-sm text-foreground/60">
-        Mejlovi koje si poslao ili zakazao iz aplikacije.
+        Mejlovi koje si poslao ili zakazao iz aplikacije za projekat{" "}
+        {project.name}.
       </p>
 
       <div className="mb-6 space-y-3">

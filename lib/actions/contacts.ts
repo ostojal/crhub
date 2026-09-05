@@ -6,7 +6,7 @@ import {
   INTEREST_TAGS,
 } from "@/lib/constants";
 import { setContactStatus } from "@/lib/contact-status";
-import { checkRole } from "@/lib/dal";
+import { checkProjectRole, checkRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { cleanText, isId, isOneOf, normalizeEmail } from "@/lib/validate";
@@ -135,7 +135,8 @@ export type ContactDeleteImpact =
   | { ok: true; interactions: number; assigned: boolean }
   | { ok: false; error: string };
 
-// Read helper za dijalog brisanja: šta se sve briše zajedno sa kontaktom
+// Read helper za dijalog brisanja: šta se sve briše zajedno sa kontaktom.
+// Kontakt je zajednički za sve projekte, pa se broji istorija sa svih.
 export async function getContactDeleteImpact(
   contactId: number,
 ): Promise<ContactDeleteImpact> {
@@ -172,7 +173,8 @@ export async function deleteContact(contactId: number): Promise<ActionResult> {
 
   const supabase = createClient();
 
-  // Prvo deca (nema kaskadnog brisanja u šemi), pa sam kontakt
+  // Prvo deca (nema kaskadnog brisanja u šemi), pa sam kontakt. Kontakt je
+  // zajednički, pa nestaje sa svih projekata odjednom.
   for (const table of [
     "interactions",
     "assignments",
@@ -249,8 +251,9 @@ export async function updateContactsStatus(
   status: string,
   interestTag: string | null | undefined,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (
     !Array.isArray(contactIds) ||
@@ -276,6 +279,7 @@ export async function updateContactsStatus(
   for (const contactId of contactIds) {
     const statusOk = await setContactStatus(
       supabase,
+      project.id,
       contactId,
       {
         communication_status: status,

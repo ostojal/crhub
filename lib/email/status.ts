@@ -23,11 +23,13 @@ const OPEN_STATUSES = new Set<CommunicationStatus>([
 
 async function currentStatus(
   supabase: Client,
+  projectId: number,
   contactId: number,
 ): Promise<CommunicationStatus | null> {
   const { data } = await supabase
     .from("contact_status")
     .select("communication_status")
+    .eq("project_id", projectId)
     .eq("contact_id", contactId)
     .order("updated_at", { ascending: false })
     .limit(1)
@@ -36,7 +38,8 @@ async function currentStatus(
   return data?.communication_status ?? null;
 }
 
-// Status kontakta posle zakazivanja ili slanja mejla iz aplikacije.
+// Status kontakta posle zakazivanja ili slanja mejla iz aplikacije. Sve se
+// računa unutar jednog projekta.
 //
 // Da li je mejl prvi ili follow up ne sme da se čita iz statusa: ako je neko
 // ručno upisao "Poslato" dok je mejl čekao slanje, samo slanje bi ispalo
@@ -44,15 +47,18 @@ async function currentStatus(
 // poslati mejlovi tom kontaktu, bez ovog reda.
 export async function advanceStatusForEmail(
   supabase: Client,
+  projectId: number,
   contactId: number,
   emailId: number,
   actor: string,
 ): Promise<void> {
   const [status, { count: earlierSent }] = await Promise.all([
-    currentStatus(supabase, contactId),
+    currentStatus(supabase, projectId, contactId),
+    // Mejlovi poslati na drugom projektu ne čine ovaj mejl follow up-om
     supabase
       .from("emails")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("contact_id", contactId)
       .eq("status", "sent")
       .neq("id", emailId),
@@ -70,6 +76,7 @@ export async function advanceStatusForEmail(
 
   await setContactStatus(
     supabase,
+    projectId,
     contactId,
     { communication_status: next },
     actor,
@@ -81,21 +88,24 @@ export async function advanceStatusForEmail(
 // kontaktiranja. Inače status pripada nečem drugom i ne dira se.
 export async function revertStatusAfterCancel(
   supabase: Client,
+  projectId: number,
   contactId: number,
   actor: string,
 ): Promise<void> {
-  const status = await currentStatus(supabase, contactId);
+  const status = await currentStatus(supabase, projectId, contactId);
   if (status !== "Poslato" && status !== "Poslat follow up") return;
 
   const [{ count: emails }, { count: contacted }] = await Promise.all([
     supabase
       .from("emails")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("contact_id", contactId)
       .in("status", [...PENDING_EMAIL_STATUSES, "sent"]),
     supabase
       .from("interactions")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("contact_id", contactId)
       .or(NOT_NOTE_FILTER),
   ]);
@@ -104,6 +114,7 @@ export async function revertStatusAfterCancel(
 
   await setContactStatus(
     supabase,
+    projectId,
     contactId,
     { communication_status: "Nije kontaktiran" },
     actor,
@@ -114,6 +125,7 @@ export async function revertStatusAfterCancel(
 // Prazan spisak id-jeva ne ide u bazu.
 export async function getPendingEmailContactIds(
   supabase: Client,
+  projectId: number,
   contactIds: number[],
 ): Promise<Set<number>> {
   if (contactIds.length === 0) return new Set();
@@ -121,6 +133,7 @@ export async function getPendingEmailContactIds(
   const { data } = await supabase
     .from("emails")
     .select("contact_id")
+    .eq("project_id", projectId)
     .in("contact_id", contactIds)
     .in("status", [...PENDING_EMAIL_STATUSES]);
 

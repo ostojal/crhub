@@ -1,8 +1,10 @@
 import { signOut } from "@/auth";
+import { ProjectSwitcher } from "@/components/project-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { APP_NAME, ROLE_LABELS } from "@/lib/constants";
 import { getCurrentUser, getSession } from "@/lib/dal";
 import { NAV_LINKS } from "@/lib/nav";
+import { getActiveProject, getProjects } from "@/lib/projects";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { FdLogo } from "./fd-logo";
@@ -23,6 +25,11 @@ export default async function Navbar() {
 
   const user = await getCurrentUser();
   const links = user ? NAV_LINKS[user.role] : [];
+
+  // Nalog na čekanju ne vidi nikakve podatke, pa mu ni projekat ništa ne znači
+  const [projects, activeProject] = user
+    ? await Promise.all([getProjects(), getActiveProject()])
+    : [[], null];
 
   const { name, email, image } = session.user;
   const initial = (name ?? email ?? "?").charAt(0).toUpperCase();
@@ -54,6 +61,11 @@ export default async function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <ProjectSwitcher
+            projects={projects}
+            activeSlug={activeProject?.slug ?? null}
+          />
+
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-3">
               {image ? (

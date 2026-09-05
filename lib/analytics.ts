@@ -11,6 +11,7 @@ import {
   NOT_NOTE_FILTER,
   NO_CATEGORY_LABEL,
 } from "@/lib/constants";
+import { getContactStatuses } from "@/lib/contact-status";
 import { createClient } from "@/lib/supabase/server";
 import { isOneOf } from "@/lib/validate";
 
@@ -52,11 +53,13 @@ export type UserStats = {
   recent: RecentInteraction[];
 };
 
-// Kontaktirani partneri razvrstani po kategoriji. Broje se RAZLIČITI kontakti
-// kojima je poslat bar jedan mejl, ne redovi u tabeli mejlova — dva mejla
-// istom partneru su i dalje jedan kontaktiran partner.
+// Kontaktirani partneri razvrstani po kategoriji, unutar jednog projekta.
+// Broje se RAZLIČITI kontakti kojima je poslat bar jedan mejl, ne redovi u
+// tabeli mejlova — dva mejla istom partneru su i dalje jedan kontaktiran
+// partner.
 // userId izostavljen = ceo tim.
 export async function getContactedByCategory(
+  projectId: number,
   userId?: number,
 ): Promise<CountItem[]> {
   const supabase = createClient();
@@ -64,6 +67,7 @@ export async function getContactedByCategory(
   const query = supabase
     .from("emails")
     .select("contact_id, contacts(category)")
+    .eq("project_id", projectId)
     .eq("status", "sent")
     .not("contact_id", "is", null)
     .limit(ROW_LIMIT);
@@ -108,13 +112,16 @@ function interactionTypeLabel(type: string | null): string {
   return type || "Nepoznato";
 }
 
-export async function getUserStats(userId: number): Promise<UserStats> {
+export async function getUserStats(
+  projectId: number,
+  userId: number,
+): Promise<UserStats> {
   const supabase = createClient();
 
   const [
     assignedRes,
     interactionsRes,
-    statusRes,
+    assignedContactsRes,
     recentRes,
     byCategory,
     sentRes,
@@ -124,16 +131,19 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     supabase
       .from("assignments")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("user_id", userId),
     supabase
       .from("interactions")
       .select("contact_id, type, created_at")
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(ROW_LIMIT),
     supabase
       .from("assignments")
-      .select("contacts(id, contact_status(communication_status, updated_at))")
+      .select("contact_id")
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .limit(ROW_LIMIT),
     supabase
@@ -141,13 +151,15 @@ export async function getUserStats(userId: number): Promise<UserStats> {
       .select(
         "id, type, notes, created_at, contacts(id, first_name, last_name, company)",
       )
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(RECENT_INTERACTIONS_LIMIT),
-    getContactedByCategory(userId),
+    getContactedByCategory(projectId, userId),
     supabase
       .from("emails")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .eq("status", "sent"),
     // Pravi count, ne .length nad povučenim redovima — taj bi se tiho
@@ -155,6 +167,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     supabase
       .from("interactions")
       .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .or(NOT_NOTE_FILTER),
     // Za follow up-ove treba i broj različitih kontakata kojima je slato, pa
@@ -162,6 +175,7 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     supabase
       .from("emails")
       .select("contact_id")
+      .eq("project_id", projectId)
       .eq("user_id", userId)
       .eq("status", "sent")
       .not("contact_id", "is", null)
@@ -199,13 +213,22 @@ export async function getUserStats(userId: number): Promise<UserStats> {
     }
   }
 
+  // Status dodeljenih kontakata na ovom projektu; kontakt bez upisanog
+  // statusa je "Nije kontaktiran"
+  const assignedContactIds = (assignedContactsRes.data ?? [])
+    .map((row) => row.contact_id)
+    .filter((id) => id !== null);
+
+  const statuses = await getContactStatuses(
+    supabase,
+    projectId,
+    assignedContactIds,
+  );
+
   const byStatusMap = new Map<string, number>();
-  for (const row of statusRes.data ?? []) {
-    const statuses = row.contacts?.contact_status ?? [];
-    const newest = [...statuses].sort((a, b) =>
-      b.updated_at.localeCompare(a.updated_at),
-    )[0];
-    const status = newest?.communication_status ?? "Nije kontaktiran";
+  for (const contactId of assignedContactIds) {
+    const status =
+      statuses.get(contactId)?.communication_status ?? "Nije kontaktiran";
     byStatusMap.set(status, (byStatusMap.get(status) ?? 0) + 1);
   }
 
@@ -265,7 +288,9 @@ export type UserSummaryRow = {
   lastActivity: string | null;
 };
 
-export async function getUsersSummary(): Promise<UserSummaryRow[]> {
+export async function getUsersSummary(
+  projectId: number,
+): Promise<UserSummaryRow[]> {
   const supabase = createClient();
 
   const [usersRes, assignmentsRes, interactionsRes, emailsRes] =
@@ -275,15 +300,21 @@ export async function getUsersSummary(): Promise<UserSummaryRow[]> {
         .select("id, full_name, email")
         .eq("role", "user")
         .order("full_name", { ascending: true }),
-      supabase.from("assignments").select("user_id").limit(ROW_LIMIT),
+      supabase
+        .from("assignments")
+        .select("user_id")
+        .eq("project_id", projectId)
+        .limit(ROW_LIMIT),
       supabase
         .from("interactions")
         .select("user_id, contact_id, type, created_at")
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(ROW_LIMIT),
       supabase
         .from("emails")
         .select("user_id, contact_id")
+        .eq("project_id", projectId)
         .eq("status", "sent")
         .not("contact_id", "is", null)
         .limit(ROW_LIMIT),

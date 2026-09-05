@@ -123,6 +123,7 @@ async function logSentEmail(
   const { data: since } = await supabase
     .from("interactions")
     .select("notes")
+    .eq("project_id", email.project_id)
     .eq("contact_id", email.contact_id)
     .eq("user_id", email.user_id)
     .eq("type", "email")
@@ -135,6 +136,7 @@ async function logSentEmail(
 
   if (!loggedByHand) {
     await supabase.from("interactions").insert({
+      project_id: email.project_id,
       contact_id: email.contact_id,
       user_id: email.user_id,
       type: "email",
@@ -144,6 +146,7 @@ async function logSentEmail(
 
   await advanceStatusForEmail(
     supabase,
+    email.project_id,
     email.contact_id,
     email.id,
     senderEmail,

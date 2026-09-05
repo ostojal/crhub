@@ -1,7 +1,7 @@
 "use server";
 
 import { setContactStatus } from "@/lib/contact-status";
-import { checkRole, hasContactAccess } from "@/lib/dal";
+import { checkProjectRole, hasContactAccess } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { isId } from "@/lib/validate";
@@ -14,17 +14,20 @@ const NO_PERMISSION = "Nemaš dozvolu za ovu akciju.";
 export async function markReplyReceived(
   contactId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
+
   if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
-  if (!(await hasContactAccess(me, contactId))) {
+  if (!(await hasContactAccess(me, contactId, project.id))) {
     return { ok: false, error: NO_PERMISSION };
   }
 
   const supabase = createClient();
   const ok = await setContactStatus(
     supabase,
+    project.id,
     contactId,
     { communication_status: "Dobijen odgovor" },
     me.email,

@@ -7,7 +7,7 @@ import {
   NOTE_TYPE,
 } from "@/lib/constants";
 import { setContactStatus } from "@/lib/contact-status";
-import { checkRole } from "@/lib/dal";
+import { checkProjectRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { cleanText, isId, isOneOf } from "@/lib/validate";
@@ -23,14 +23,16 @@ export type LogInteractionInput = {
   interestTag?: string;
 };
 
-// Evidentira isto kontaktiranje za jedan ili više kontakata; admin za bilo
-// koji kontakt, user samo za kontakte koji su mu dodeljeni
+// Evidentira isto kontaktiranje za jedan ili više kontakata na aktivnom
+// projektu; admin za bilo koji kontakt, user samo za kontakte koji su mu
+// dodeljeni
 export async function logInteractions(
   contactIds: number[],
   input: LogInteractionInput,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (
     !Array.isArray(contactIds) ||
@@ -66,6 +68,7 @@ export async function logInteractions(
     const { data: assignments } = await supabase
       .from("assignments")
       .select("contact_id")
+      .eq("project_id", project.id)
       .in("contact_id", contactIds)
       .eq("user_id", me.id);
 
@@ -77,6 +80,7 @@ export async function logInteractions(
 
   const { error } = await supabase.from("interactions").insert(
     contactIds.map((contactId) => ({
+      project_id: project.id,
       contact_id: contactId,
       user_id: me.id,
       type: input.type,
@@ -92,6 +96,7 @@ export async function logInteractions(
     for (const contactId of contactIds) {
       const statusOk = await setContactStatus(
         supabase,
+        project.id,
         contactId,
         {
           ...(newStatus !== undefined && { communication_status: newStatus }),
@@ -137,8 +142,9 @@ export async function setInteractionType(
   interactionId: number,
   type: string,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (!isId(interactionId)) return { ok: false, error: "Nepoznat unos." };
   if (!isOneOf(type, INTERACTION_TYPES)) {
@@ -147,10 +153,12 @@ export async function setInteractionType(
 
   const supabase = createClient();
 
+  // Unos sa drugog projekta se ne vidi ni u istoriji, pa se ni ne menja
   const { data: existing } = await supabase
     .from("interactions")
     .select("id, user_id, contact_id")
     .eq("id", interactionId)
+    .eq("project_id", project.id)
     .maybeSingle();
 
   if (!existing) return { ok: false, error: "Unos ne postoji." };
@@ -181,8 +189,9 @@ export async function setInteractionType(
 export async function deleteInteraction(
   interactionId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "user");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (!isId(interactionId)) return { ok: false, error: "Nepoznat unos." };
 
@@ -192,6 +201,7 @@ export async function deleteInteraction(
     .from("interactions")
     .select("id, user_id, contact_id")
     .eq("id", interactionId)
+    .eq("project_id", project.id)
     .maybeSingle();
 
   if (!existing) return { ok: false, error: "Unos ne postoji." };

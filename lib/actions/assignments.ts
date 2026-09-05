@@ -1,12 +1,11 @@
 "use server";
 
-import { checkRole } from "@/lib/dal";
+import { checkProjectRole } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "@/lib/types";
 import { cleanText, isId } from "@/lib/validate";
 import { revalidatePath } from "next/cache";
 
-const NO_PERMISSION = "Nemaš dozvolu za ovu akciju.";
 const MAX_BULK = 25;
 
 function revalidateAssignmentPaths() {
@@ -35,8 +34,9 @@ export async function assignContact(
   userId: number,
   overwrite: boolean,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (!isId(contactId) || !isId(userId)) {
     return { ok: false, error: "Nepoznat kontakt ili korisnik." };
@@ -51,6 +51,7 @@ export async function assignContact(
   const { data: existing } = await supabase
     .from("assignments")
     .select("id, user_id")
+    .eq("project_id", project.id)
     .eq("contact_id", contactId)
     .limit(1)
     .maybeSingle();
@@ -63,17 +64,20 @@ export async function assignContact(
     return { ok: false, error: "Kontakt je već dodeljen drugom korisniku." };
   }
 
-  // Jedan aktivan izvršilac po kontaktu: prebacivanje = brisanje pa upis
+  // Jedan aktivan izvršilac po kontaktu i projektu: prebacivanje = brisanje
+  // pa upis
   if (existing) {
     const { error: deleteError } = await supabase
       .from("assignments")
       .delete()
+      .eq("project_id", project.id)
       .eq("contact_id", contactId);
 
     if (deleteError) return { ok: false, error: "Greška pri dodeli." };
   }
 
   const { error } = await supabase.from("assignments").insert({
+    project_id: project.id,
     contact_id: contactId,
     user_id: userId,
     assigned_by: me.email,
@@ -89,8 +93,9 @@ export async function assignContacts(
   contactIds: number[],
   userId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   if (
     !Array.isArray(contactIds) ||
@@ -111,12 +116,14 @@ export async function assignContacts(
   const { error: deleteError } = await supabase
     .from("assignments")
     .delete()
+    .eq("project_id", project.id)
     .in("contact_id", contactIds);
 
   if (deleteError) return { ok: false, error: "Greška pri dodeli." };
 
   const { error } = await supabase.from("assignments").insert(
     contactIds.map((contactId) => ({
+      project_id: project.id,
       contact_id: contactId,
       user_id: userId,
       assigned_by: me.email,
@@ -136,8 +143,9 @@ export async function assignCompany(
   rawCompany: string,
   userId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { user: me, project } = ctx;
 
   const company = cleanText(rawCompany, 300);
   if (!company || !isId(userId)) {
@@ -166,12 +174,14 @@ export async function assignCompany(
   const { error: deleteError } = await supabase
     .from("assignments")
     .delete()
+    .eq("project_id", project.id)
     .in("contact_id", contactIds);
 
   if (deleteError) return { ok: false, error: "Greška pri dodeli." };
 
   const { error } = await supabase.from("assignments").insert(
     contactIds.map((contactId) => ({
+      project_id: project.id,
       contact_id: contactId,
       user_id: userId,
       assigned_by: me.email,
@@ -190,8 +200,9 @@ export async function assignCompany(
 export async function unassignContacts(
   contactIds: number[],
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
 
   if (
     !Array.isArray(contactIds) ||
@@ -206,6 +217,7 @@ export async function unassignContacts(
   const { error } = await supabase
     .from("assignments")
     .delete()
+    .eq("project_id", project.id)
     .in("contact_id", contactIds);
 
   if (error) return { ok: false, error: "Greška pri uklanjanju dodela." };
@@ -217,8 +229,9 @@ export async function unassignContacts(
 export async function unassignContact(
   contactId: number,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
 
   if (!isId(contactId)) return { ok: false, error: "Nepoznat kontakt." };
 
@@ -226,6 +239,7 @@ export async function unassignContact(
   const { error } = await supabase
     .from("assignments")
     .delete()
+    .eq("project_id", project.id)
     .eq("contact_id", contactId);
 
   if (error) return { ok: false, error: "Greška pri uklanjanju dodele." };
@@ -242,8 +256,9 @@ export type CompanyAssignmentInfo =
 export async function getCompanyAssignmentInfo(
   rawCompany: string,
 ): Promise<CompanyAssignmentInfo> {
-  const me = await checkRole("admin", "editor");
-  if (!me) return { ok: false, error: NO_PERMISSION };
+  const ctx = await checkProjectRole("admin", "editor");
+  if (!ctx.ok) return ctx;
+  const { project } = ctx;
 
   const company = cleanText(rawCompany, 300);
   if (!company) return { ok: false, error: "Neispravna kompanija." };
@@ -253,7 +268,8 @@ export async function getCompanyAssignmentInfo(
   const { data: contacts, error } = await supabase
     .from("contacts")
     .select("id, assignments(id)")
-    .eq("company", company);
+    .eq("company", company)
+    .eq("assignments.project_id", project.id);
 
   if (error) return { ok: false, error: "Greška pri čitanju firme." };
 
