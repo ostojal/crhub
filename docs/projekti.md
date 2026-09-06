@@ -39,9 +39,14 @@ statusa, bez istorije i bez mejl šablona.
 - **Admin → Projekti** (`/admin/projekti`) služi za dodavanje novog projekta,
   preimenovanje, arhiviranje i brisanje. Prikazuje i koliko je na kom
   projektu upisano dodela, kontaktiranja i mejlova.
-- **Arhiviranje** sklanja projekat iz birača, ali čuva svu istoriju; cron za
-  follow up preskače arhivirane projekte. **Brisanje** je moguće samo dok je
-  projekat potpuno prazan — baza to dodatno brani stranim ključem.
+- **Više projekata teče uporedo.** Posle `db/projects.sql` i DigiHack i
+  GreenTour su aktivni: oba stoje u biraču, follow up radi na oba, i prelazak
+  s jednog na drugi je samo izbor u zaglavlju. Ništa se ne arhivira samo od
+  sebe.
+- **Arhiviranje** je za projekat koji je završen: sklanja ga iz birača i cron
+  za follow up ga preskače, ali sva istorija ostaje i vraćanje u rad je jedan
+  klik. **Brisanje** je moguće samo dok je projekat potpuno prazan — baza to
+  dodatno brani stranim ključem.
 
 ## Šta ostaje zajedničko i zašto
 
