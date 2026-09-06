@@ -112,7 +112,7 @@ function logFailure(url: URL, reason: ImageFetchFailure, status?: number) {
 export async function fetchImageAsDataUrl(
   rawUrl: string,
 ): Promise<FetchedImage> {
-  const me = await checkRole("admin", "user");
+  const me = await checkRole("admin", "editor", "user");
   if (!me) return { ok: false, reason: "blocked_url" };
 
   const target = publicHttpUrl(rawUrl);

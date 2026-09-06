@@ -92,7 +92,7 @@ export default async function Home() {
         </p>
       )}
 
-      {project && user.role === "user" && (
+      {project && (user.role === "user" || user.role === "editor") && (
         <UserDashboard projectId={project.id} userId={user.id} />
       )}
       {project && user.role === "admin" && (

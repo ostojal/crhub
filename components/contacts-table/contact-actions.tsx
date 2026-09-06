@@ -98,100 +98,103 @@ export function ContactActions({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="min-w-max">
+        {/* Pregled i rad sa kontaktom idu i uredniku; izmena samog kontakta
+            (podaci, beleška, brisanje) ostaje adminu */}
+        <DropdownMenuItem asChild>
+          <Link href={`/contacts/${contact.id}`}>
+            <ExternalLinkIcon />
+            Detalji
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          disabled={!contact.email}
+          onSelect={() => handlers.onCompose(contact)}
+        >
+          <SendIcon />
+          Kontaktiraj (mejl)
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onSelect={() => handlers.onLog(contact)}>
+          <PhoneOutgoingIcon />
+          Evidentiraj kontaktiranje
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onClick={() => navigator.clipboard.writeText(String(contact.id))}
+        >
+          <CopyIcon />
+          Kopiraj id
+        </DropdownMenuItem>
+
+        {contact.email && (
+          <DropdownMenuItem
+            onClick={() => navigator.clipboard.writeText(contact.email!)}
+          >
+            <MailIcon />
+            Kopiraj email
+          </DropdownMenuItem>
+        )}
+
+        {contact.mobile_phone && (
+          <DropdownMenuItem
+            onClick={() => navigator.clipboard.writeText(contact.mobile_phone!)}
+          >
+            <PhoneCallIcon />
+            Kopiraj mobilni telefon
+          </DropdownMenuItem>
+        )}
+
+        {contact.phone && (
+          <DropdownMenuItem
+            onClick={() => navigator.clipboard.writeText(contact.phone!)}
+          >
+            <VoicemailIcon />
+            Kopiraj fiksni telefon
+          </DropdownMenuItem>
+        )}
+
+        {/* Uredniku se beleška nudi samo kad postoji — pisanje je adminovo */}
+        {(isAdmin || contact.notes) && (
+          <NotesDialog contact={contact} canEdit={isAdmin}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+              }}
+            >
+              <NotebookIcon />
+              {contact.notes ? "Prikaži belešku" : "Dodaj belešku"}
+            </DropdownMenuItem>
+          </NotesDialog>
+        )}
+
+        <DropdownMenuSeparator />
+
         {isAdmin && (
-          <>
-            <DropdownMenuItem asChild>
-              <Link href={`/contacts/${contact.id}`}>
-                <ExternalLinkIcon />
-                Detalji
-              </Link>
-            </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => handlers.onEdit(contact)}>
+            <EditIcon />
+            Promeni info
+          </DropdownMenuItem>
+        )}
 
+        <DropdownMenuItem onSelect={() => handlers.onEditStatus(contact)}>
+          <InfoIcon />
+          Promeni status
+        </DropdownMenuItem>
+
+        {isAdmin && (
+          <NotesDialog contact={contact} defaultEditing>
             <DropdownMenuItem
-              disabled={!contact.email}
-              onSelect={() => handlers.onCompose(contact)}
+              onSelect={(e) => {
+                e.preventDefault();
+              }}
             >
-              <SendIcon />
-              Kontaktiraj (mejl)
+              <NotebookPenIcon />
+              Promeni note
             </DropdownMenuItem>
-
-            <DropdownMenuItem onSelect={() => handlers.onLog(contact)}>
-              <PhoneOutgoingIcon />
-              Evidentiraj kontaktiranje
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(String(contact.id))}
-            >
-              <CopyIcon />
-              Kopiraj id
-            </DropdownMenuItem>
-
-            {contact.email && (
-              <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(contact.email!)}
-              >
-                <MailIcon />
-                Kopiraj email
-              </DropdownMenuItem>
-            )}
-
-            {contact.mobile_phone && (
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(contact.mobile_phone!)
-                }
-              >
-                <PhoneCallIcon />
-                Kopiraj mobilni telefon
-              </DropdownMenuItem>
-            )}
-
-            {contact.phone && (
-              <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(contact.phone!)}
-              >
-                <VoicemailIcon />
-                Kopiraj fiksni telefon
-              </DropdownMenuItem>
-            )}
-
-            <NotesDialog contact={contact}>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                }}
-              >
-                <NotebookIcon />
-                {contact.notes ? "Prikaži belešku" : "Dodaj belešku"}
-              </DropdownMenuItem>
-            </NotesDialog>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem onSelect={() => handlers.onEdit(contact)}>
-              <EditIcon />
-              Promeni info
-            </DropdownMenuItem>
-
-            <DropdownMenuItem onSelect={() => handlers.onEditStatus(contact)}>
-              <InfoIcon />
-              Promeni status
-            </DropdownMenuItem>
-
-            <NotesDialog contact={contact} defaultEditing>
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                }}
-              >
-                <NotebookPenIcon />
-                Promeni note
-              </DropdownMenuItem>
-            </NotesDialog>
-          </>
+          </NotesDialog>
         )}
 
         <DropdownMenuItem onSelect={() => handlers.onAssign(contact)}>

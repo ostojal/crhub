@@ -14,28 +14,33 @@ export function ContactAdminActions({
   contactName,
   currentStatus,
   currentTag,
+  canEditContact,
 }: {
   contact: ContactEditable;
   contactName: string;
   currentStatus: string | null;
   currentTag: string | null;
+  // Same podatke kontakta menja samo admin; status menja i urednik
+  canEditContact: boolean;
 }) {
   const [dialog, setDialog] = useState<"edit" | "status" | null>(null);
 
   return (
     <>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => setDialog("edit")}>
-          <PencilIcon data-icon="inline-start" />
-          Izmeni podatke
-        </Button>
+        {canEditContact && (
+          <Button variant="outline" onClick={() => setDialog("edit")}>
+            <PencilIcon data-icon="inline-start" />
+            Izmeni podatke
+          </Button>
+        )}
         <Button variant="outline" onClick={() => setDialog("status")}>
           <TagIcon data-icon="inline-start" />
           Izmeni status
         </Button>
       </div>
 
-      {dialog === "edit" && (
+      {dialog === "edit" && canEditContact && (
         <ContactFormDialog contact={contact} onClose={() => setDialog(null)} />
       )}
 

@@ -107,7 +107,7 @@ export default async function ContactDetailPage({
     {
       label: "Kompanija",
       value:
-        contact.company && me.role === "admin" ? (
+        contact.company && me.role !== "user" ? (
           <Link
             href={`/firme/${encodeURIComponent(contact.company)}`}
             className="underline-offset-4 hover:underline"
@@ -167,7 +167,7 @@ export default async function ContactDetailPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {me.role === "admin" && (
+          {me.role !== "user" && (
             <ContactAdminActions
               contact={{
                 id: contact.id,
@@ -185,6 +185,7 @@ export default async function ContactDetailPage({
               contactName={name}
               currentStatus={status?.communication_status ?? null}
               currentTag={status?.interest_tag ?? null}
+              canEditContact={me.role === "admin"}
             />
           )}
           <ContactButtons

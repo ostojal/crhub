@@ -93,28 +93,29 @@ export function ContactBulkActions({
         Ukloni pristup
       </Button>
 
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() => onEditStatus(contacts)}
+      >
+        <InfoIcon data-icon="inline-start" />
+        Promeni status
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() => onLog(contacts)}
+      >
+        <PhoneOutgoingIcon data-icon="inline-start" />
+        Evidentiraj kontaktiranje
+      </Button>
+
+      {/* Brisanje kontakata ostaje adminu */}
       {isAdmin && (
         <>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={() => onEditStatus(contacts)}
-          >
-            <InfoIcon data-icon="inline-start" />
-            Promeni status
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isPending}
-            onClick={() => onLog(contacts)}
-          >
-            <PhoneOutgoingIcon data-icon="inline-start" />
-            Evidentiraj kontaktiranje
-          </Button>
-
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="destructive" disabled={isPending}>

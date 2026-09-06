@@ -19,17 +19,20 @@ import { editNote } from "./edit-note";
 type NotesDialogProps = {
   contact: ContactRow;
   defaultEditing?: boolean;
+  // Belešku piše samo admin; uredniku se ista beleška prikazuje bez izmene
+  canEdit?: boolean;
   children: React.ReactNode;
 };
 
 export function NotesDialog({
   defaultEditing,
+  canEdit = true,
   contact,
   children,
 }: NotesDialogProps) {
   // Kad beleške još nema, dijalog se otvara pravo u režimu pisanja — inače
   // prva beleška ne bi mogla da se doda
-  const startsEditing = defaultEditing || !contact.notes;
+  const startsEditing = canEdit && (defaultEditing || !contact.notes);
   const [editing, setEditing] = useState(startsEditing);
 
   return (
@@ -94,7 +97,7 @@ export function NotesDialog({
             </DialogFooter>
           )}
 
-          {!editing && (
+          {!editing && canEdit && (
             <DialogFooter>
               <Button
                 type="button"

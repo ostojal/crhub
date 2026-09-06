@@ -12,7 +12,7 @@ import { Suspense } from "react";
 const EMAIL_LIMIT = 100;
 
 export default async function EmailsPage() {
-  const me = await requireRole("admin", "user");
+  const me = await requireRole("admin", "editor", "user");
   const project = await requireActiveProject();
 
   const supabase = createClient();

@@ -67,7 +67,7 @@ export type ComposeContext =
 export async function getComposeContext(
   contactId: number,
 ): Promise<ComposeContext> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -277,7 +277,7 @@ async function parseEmailContent(
 export async function composeEmail(
   input: ComposeEmailInput,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -391,7 +391,7 @@ export type EmailDetails =
 
 // Pun sadržaj jednog mejla — za pregled poslatog i za izmenu zakazanog
 export async function getEmailDetails(emailId: number): Promise<EmailDetails> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -462,7 +462,7 @@ export async function updateScheduledEmail(
   emailId: number,
   input: Omit<ComposeEmailInput, "contactId">,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -516,7 +516,7 @@ export async function updateScheduledEmail(
 export async function cancelScheduledEmail(
   emailId: number,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -567,7 +567,7 @@ export async function cancelScheduledEmail(
 export async function updateEmailSignature(
   signature: string,
 ): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
+  const me = await checkRole("admin", "editor", "user");
   if (!me) return { ok: false, error: NO_PERMISSION };
 
   if ((signature ?? "").length > MAX_SIGNATURE_CHARS) {
@@ -591,7 +591,7 @@ export async function updateEmailSignature(
 }
 
 export async function disconnectGmail(): Promise<ActionResult> {
-  const me = await checkRole("admin", "user");
+  const me = await checkRole("admin", "editor", "user");
   if (!me) return { ok: false, error: NO_PERMISSION };
 
   const supabase = createClient();

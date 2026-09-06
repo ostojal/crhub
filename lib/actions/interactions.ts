@@ -30,7 +30,7 @@ export async function logInteractions(
   contactIds: number[],
   input: LogInteractionInput,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -142,7 +142,7 @@ export async function setInteractionType(
   interactionId: number,
   type: string,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
@@ -189,7 +189,7 @@ export async function setInteractionType(
 export async function deleteInteraction(
   interactionId: number,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 
