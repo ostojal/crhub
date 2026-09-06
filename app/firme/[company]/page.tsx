@@ -53,7 +53,7 @@ export default async function CompanyPage({
   // Provera uloge i upit idu istim kruženjem do baze; kad uloga ne odgovara,
   // requireRole preusmerava i dohvaćeni redovi se nikad ne prikažu
   const [, { data, error }] = await Promise.all([
-    requireRole("admin"),
+    requireRole("admin", "editor"),
     supabase
       .from("contacts")
       .select(

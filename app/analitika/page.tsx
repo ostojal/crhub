@@ -17,7 +17,7 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<{ user?: string }>;
 }) {
-  const me = await requireRole("admin", "user");
+  const me = await requireRole("admin", "editor", "user");
   const project = await requireActiveProject();
 
   if (me.role === "user") {
@@ -76,9 +76,12 @@ export default async function AnalyticsPage({
     }
   }
 
-  const [rows, byCategory] = await Promise.all([
+  // Urednik i sam šalje mejlove, pa uz pregled tima dobija i svoje brojke.
+  // Zbirna tabela ispod prikazuje naloge sa ulogom korisnika, u kojoj on nije.
+  const [rows, byCategory, myStats] = await Promise.all([
     getUsersSummary(project.id),
     getContactedByCategory(project.id),
+    me.role === "editor" ? getUserStats(project.id, me.id) : null,
   ]);
 
   const contactedTotal = byCategory.reduce((sum, item) => sum + item.count, 0);
@@ -115,6 +118,18 @@ export default async function AnalyticsPage({
         </CardContent>
       </Card>
 
+      {myStats && (
+        <section className="mb-8">
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            Moja analitika
+          </h2>
+          <UserStatsView stats={myStats} />
+        </section>
+      )}
+
+      <h2 className="mb-4 text-lg font-semibold text-foreground">
+        Analitika korisnika
+      </h2>
       <UsersSummaryTable rows={rows} />
     </div>
   );

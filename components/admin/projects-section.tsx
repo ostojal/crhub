@@ -112,6 +112,12 @@ export function ProjectsSection({
             Novi projekat kreće od nule.
           </p>
 
+          <p className="text-sm text-muted-foreground">
+            Više projekata sme da teče uporedo i svi ostaju u biraču.
+            Arhiviranje je samo za projekat koji je završen — ništa se ne
+            arhivira samo od sebe.
+          </p>
+
           <form
             ref={formRef}
             onSubmit={handleCreate}

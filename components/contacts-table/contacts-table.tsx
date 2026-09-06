@@ -127,7 +127,6 @@ function ContactMobileCard({
   handlers: ContactActionHandlers;
 }) {
   const contact = row.original;
-  const isAdmin = viewer === "admin";
   const assignee = getAssigneeName(contact);
   const status = contact.contact_status?.[0]?.communication_status;
   const category =
@@ -145,27 +144,23 @@ function ContactMobileCard({
           className="mt-1"
         />
         <div className="min-w-0 flex-1">
-          {isAdmin ? (
-            <span className="flex items-center gap-2">
-              <Link
-                href={`/contacts/${contact.id}`}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {contactName(contact)}
-              </Link>
-              {contact.notes && (
-                <NotebookTextIcon className="size-4 shrink-0 text-muted-foreground" />
-              )}
-            </span>
-          ) : (
-            <span className="font-medium">{contact.company ?? "—"}</span>
-          )}
+          <span className="flex items-center gap-2">
+            <Link
+              href={`/contacts/${contact.id}`}
+              className="font-medium underline-offset-4 hover:underline"
+            >
+              {contactName(contact)}
+            </Link>
+            {contact.notes && (
+              <NotebookTextIcon className="size-4 shrink-0 text-muted-foreground" />
+            )}
+          </span>
         </div>
         <ContactActions contact={contact} viewer={viewer} handlers={handlers} />
       </div>
 
       <div className="border-t pt-2">
-        {isAdmin && contact.company && (
+        {contact.company && (
           <MobileField label="Kompanija">
             <Link
               href={`/firme/${encodeURIComponent(contact.company)}`}
@@ -178,12 +173,12 @@ function ContactMobileCard({
         {contact.job_title && (
           <MobileField label="Pozicija">{contact.job_title}</MobileField>
         )}
-        {isAdmin && category && (
+        {category && (
           <MobileField label="Kategorija">
             <CategoryBadge category={category} />
           </MobileField>
         )}
-        {isAdmin && contact.email && (
+        {contact.email && (
           <MobileField label="Email">
             <span className="inline-flex items-center gap-1">
               {contact.email}
@@ -191,7 +186,7 @@ function ContactMobileCard({
             </span>
           </MobileField>
         )}
-        {isAdmin && contact.phone && (
+        {contact.phone && (
           <MobileField label="Telefon">
             <span className="inline-flex items-center gap-1">
               {formatPhoneNumber(contact.phone)}
@@ -199,18 +194,16 @@ function ContactMobileCard({
             </span>
           </MobileField>
         )}
-        {isAdmin && (
-          <MobileField label="Status">
-            <StatusBadge status={status} pending={contact.email_pending} />
-          </MobileField>
-        )}
-        {isAdmin && contact.created_at && (
+        <MobileField label="Status">
+          <StatusBadge status={status} pending={contact.email_pending} />
+        </MobileField>
+        {contact.created_at && (
           <MobileField label="Dodat">
             {format(contact.created_at, "dd.MM.yyyy.")}
           </MobileField>
         )}
         <MobileField label="Dodeljeno">{assignee ?? "—"}</MobileField>
-        {isAdmin && contact.notes && (
+        {contact.notes && (
           <MobileField label="Beleška">
             <span className="whitespace-pre-wrap normal-case">
               {contact.notes}

@@ -94,7 +94,10 @@ nalog.
   podaci kontakta — `{{ime}}`, `{{prezime}}`, `{{firma}}`, `{{pozicija}}`,
   `{{grad}}` — i podaci pošiljaoca: `{{moje_ime}}`, `{{moje_prezime}}`,
   `{{moje_ime_i_prezime}}`, `{{moj_email}}`.
-- **Svaki korisnik** na `/mejlovi` jednom klikne _Poveži Gmail_. Povezuje se
+- **Mejlove šalju admin, urednik i korisnik.** Urednik pritom radi sa svim
+  kontaktima (ne može mu se dodeliti kontakt, jer dodela ide samo na ulogu
+  korisnika), a korisnik samo sa onima koji su mu dodeljeni na tom projektu.
+- **Svaki od njih** na `/mejlovi` jednom klikne _Poveži Gmail_. Povezuje se
   isključivo nalog sa kojim je prijavljen u aplikaciju — drugi Google nalog
   aplikacija odbija. Tu se podešava i **potpis**, koji se pri otvaranju
   kompozera automatski dodaje na kraj poruke (kao potpis u Gmailu) i može se

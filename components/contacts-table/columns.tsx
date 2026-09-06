@@ -147,10 +147,6 @@ export function buildContactColumns({
     enableHiding: false,
   };
 
-  if (viewer === "editor") {
-    return [select, company, jobTitle, assignee, actions];
-  }
-
   return [
     select,
     {

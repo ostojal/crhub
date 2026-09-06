@@ -251,7 +251,8 @@ export async function updateContactsStatus(
   status: string,
   interestTag: string | null | undefined,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin");
+  // Status i oznaka interesa: urednik ih menja, ali sam kontakt ne dira
+  const ctx = await checkProjectRole("admin", "editor");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 

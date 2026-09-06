@@ -14,7 +14,7 @@ const NO_PERMISSION = "Nemaš dozvolu za ovu akciju.";
 export async function markReplyReceived(
   contactId: number,
 ): Promise<ActionResult> {
-  const ctx = await checkProjectRole("admin", "user");
+  const ctx = await checkProjectRole("admin", "editor", "user");
   if (!ctx.ok) return ctx;
   const { user: me, project } = ctx;
 

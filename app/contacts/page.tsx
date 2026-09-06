@@ -9,24 +9,15 @@ import { requireRole } from "@/lib/dal";
 import { getPendingEmailContactIds } from "@/lib/email/status";
 import { requireActiveProject } from "@/lib/projects";
 import { createClient } from "@/lib/supabase/server";
-import { escapeLike, isOneOf } from "@/lib/validate";
+import { isOneOf } from "@/lib/validate";
 
 const PAGE_SIZE = 25;
 
-// PII (ime, email, telefon...) sme da bude samo u adminovom SELECT-u —
-// editor dobija isključivo firmu, poziciju i dodelu
-const ADMIN_SELECT =
+// Urednik vidi kontakt u istom obimu kao admin — bez toga ne bi mogao ni da
+// mu pošalje mejl. Razlika je u izmenama: dodavanje, izmena i brisanje
+// kontakta ostaju adminu (vidi `viewer` niže).
+const CONTACT_SELECT =
   "*, contact_status(communication_status, interest_tag, updated_at), assignments(user_id, users(id, full_name))";
-const EDITOR_SELECT =
-  "id, company, job_title, assignments(user_id, users(id, full_name))";
-
-// Editor ne sme da filtrira po PII kolonama, pa za njega q znači samo
-// jednostavnu pretragu firme i pozicije (bez posebne sintakse)
-function editorFilterExpression(term: string): string {
-  const pattern = `%${escapeLike(term.replaceAll('"', ""))}%`;
-  const value = /[,()]/.test(pattern) ? `"${pattern}"` : pattern;
-  return `company.ilike.${value},job_title.ilike.${value}`;
-}
 
 export default async function ContactsPage({
   searchParams,
@@ -39,21 +30,18 @@ export default async function ContactsPage({
   }>;
 }) {
   const me = await requireRole("admin", "editor");
-  const isAdmin = me.role === "admin";
   const project = await requireActiveProject();
 
   const { page, sort, q, category } = await searchParams;
 
   const supabase = createClient();
 
-  const query = supabase
-    .from("contacts")
-    .select(isAdmin ? ADMIN_SELECT : EDITOR_SELECT);
+  const query = supabase.from("contacts").select(CONTACT_SELECT);
 
   // Kontakti su zajednički, ali dodela i status pripadaju projektu — bez
   // ovih filtera bi se u GreenTour-u video rad na DigiHack-u
   query.eq("assignments.project_id", project.id);
-  if (isAdmin) query.eq("contact_status.project_id", project.id);
+  query.eq("contact_status.project_id", project.id);
 
   const countQuery = supabase.from("contacts").select("id", {
     count: "exact",
@@ -69,30 +57,22 @@ export default async function ContactsPage({
     countQuery.eq("category", category);
   }
 
-  const searchTerm = q?.trim();
-  const searchFilter = isAdmin ? createSearchFilter(searchTerm) : null;
+  const searchFilter = createSearchFilter(q?.trim());
 
-  if (isAdmin) {
-    if (searchFilter) {
-      applyFilter(query, searchFilter);
-      applyFilter(countQuery, searchFilter);
-    }
-
-    // Najnoviji status prvi, da [0] uvek bude aktuelan red
-    query.order("updated_at", {
-      referencedTable: "contact_status",
-      ascending: false,
-    });
-  } else if (searchTerm) {
-    query.or(editorFilterExpression(searchTerm));
-    countQuery.or(editorFilterExpression(searchTerm));
+  if (searchFilter) {
+    applyFilter(query, searchFilter);
+    applyFilter(countQuery, searchFilter);
   }
+
+  // Najnoviji status prvi, da [0] uvek bude aktuelan red
+  query.order("updated_at", {
+    referencedTable: "contact_status",
+    ascending: false,
+  });
 
   const [sortId, sortOrder] = (sort ?? "").split(":");
   const asc = sortOrder !== "desc";
-  const editorSortable = ["company", "job_title"];
-  const adminSortable = ["name", "company", "job_title", "city", "created_at"];
-  const sortable = isAdmin ? adminSortable : editorSortable;
+  const sortable = ["name", "company", "job_title", "city", "created_at"];
 
   if (sortId && sortable.includes(sortId)) {
     if (sortId === "name") {
@@ -135,14 +115,12 @@ export default async function ContactsPage({
   const rows = (contacts ?? []) as unknown as ContactRow[];
 
   // Kontakti sa mejlom koji čeka slanje — status im se prikazuje kao
-  // "Zakazano". Editor status ni ne vidi, pa se za njega upit preskače.
-  const pending = isAdmin
-    ? await getPendingEmailContactIds(
-        supabase,
-        project.id,
-        rows.map((row) => row.id),
-      )
-    : new Set<number>();
+  // "Zakazano"
+  const pending = await getPendingEmailContactIds(
+    supabase,
+    project.id,
+    rows.map((row) => row.id),
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">

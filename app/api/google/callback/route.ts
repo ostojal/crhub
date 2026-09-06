@@ -18,7 +18,10 @@ function back(request: NextRequest, outcome: Outcome) {
 
 export async function GET(request: NextRequest) {
   const me = await getCurrentUser();
-  if (!me || (me.role !== "admin" && me.role !== "user")) {
+  if (
+    !me ||
+    (me.role !== "admin" && me.role !== "editor" && me.role !== "user")
+  ) {
     return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 

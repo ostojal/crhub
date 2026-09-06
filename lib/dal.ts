@@ -97,14 +97,19 @@ export async function checkProjectRole(
 // Isto pravilo kao requireContactAccess, ali bez redirecta — za server akcije,
 // koje odgovaraju porukom umesto da preusmeravaju. Za više kontakata odjednom
 // vidi grupnu proveru u lib/actions/interactions.ts (jedan upit umesto N).
-// Dodela važi za jedan projekat: kontakt dodeljen na DigiHack-u ne otvara
-// pristup istom kontaktu na GreenTour-u.
+//
+// Admin i urednik rade sa svim kontaktima. Urednik se ne može ni dodeliti
+// (dodela ide isključivo na ulogu "user"), pa bi provera dodele za njega uvek
+// pala i ne bi mogao da pošalje nijedan mejl.
+//
+// Korisniku dodela važi za jedan projekat: kontakt dodeljen na DigiHack-u ne
+// otvara pristup istom kontaktu na GreenTour-u.
 export async function hasContactAccess(
   user: CurrentUser,
   contactId: number,
   projectId: number,
 ): Promise<boolean> {
-  if (user.role === "admin") return true;
+  if (user.role === "admin" || user.role === "editor") return true;
 
   const supabase = createClient();
   const { data } = await supabase
@@ -119,18 +124,14 @@ export async function hasContactAccess(
   return !!data;
 }
 
-// Admin sme svaki kontakt; user samo kontakt koji mu je dodeljen na
-// aktivnom projektu
+// Admin i urednik smeju svaki kontakt; user samo kontakt koji mu je dodeljen
+// na aktivnom projektu
 export async function requireContactAccess(
   contactId: number,
   projectId: number,
 ): Promise<CurrentUser> {
   const user = await requireUser();
-  if (user.role === "admin") return user;
-
-  if (user.role === "user") {
-    if (await hasContactAccess(user, contactId, projectId)) return user;
-  }
+  if (await hasContactAccess(user, contactId, projectId)) return user;
 
   redirect("/");
 }
